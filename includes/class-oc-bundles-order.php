@@ -185,10 +185,21 @@ class OC_Bundles_Order {
 		$selection = is_array( $selection ) ? $selection : array();
 
 		$amounts = array();
+		$labels  = array();
 		foreach ( $components as $index => $component ) {
 			$component = OC_Bundles_Helpers::normalize_component( $component );
 			$pid       = OC_Bundles_Helpers::effective_id( $component );
 			$qty       = self::wanted( $component, $index, $actual, $bundle_qty );
+
+			// The split line was named at checkout from the ordered quantity. Re-weighing
+			// changes what it charges, so it has to change what it says as well -- an
+			// invoice reading "0.5 kg" while charging for 1 kg is simply wrong.
+			$product = $pid ? wc_get_product( $pid ) : false;
+			if ( $product ) {
+				$scaled          = $component;
+				$scaled['qty']   = $qty;
+				$labels[ $index ] = trim( OC_Bundles_Helpers::quantity_label( $scaled ) . ' ' . $product->get_name() );
+			}
 
 			$amount = 0.0;
 			if ( $pid ) {
@@ -210,9 +221,11 @@ class OC_Bundles_Order {
 		if ( ! empty( $split ) ) {
 			foreach ( $split as $index => $line ) {
 				$amount = isset( $amounts[ $index ] ) ? $amounts[ $index ] : 0;
-				if ( (float) $line->get_total() === (float) $amount ) {
+				$label  = isset( $labels[ $index ] ) ? $labels[ $index ] : $line->get_name();
+				if ( (float) $line->get_total() === (float) $amount && $line->get_name() === $label ) {
 					continue;
 				}
+				$line->set_name( $label );
 				$line->set_subtotal( $amount );
 				$line->set_total( $amount );
 				$line->save();
