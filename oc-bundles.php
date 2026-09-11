@@ -10,7 +10,7 @@
  * Text Domain:       oc-bundles
  * Domain Path:       /languages
  * Requires Plugins:  woocommerce
- * Update URI:        https://github.com/OWNER/REPO
+ * Update URI:        https://github.com/originalconcepts/oc-bundle
  *
  * @package OC_Bundles
  */
