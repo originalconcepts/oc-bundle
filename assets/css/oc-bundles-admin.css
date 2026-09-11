@@ -1,0 +1,201 @@
+/* Original Concepts Bundles — admin panel */
+.oc-bundle-panel .oc-bundle-section {
+	padding: 14px 12px;
+	border-bottom: 1px solid #eee;
+	margin-bottom: 6px;
+}
+.oc-bundle-panel .oc-bundle-section h4 { margin: 0 0 6px; font-size: 14px; }
+.oc-bundle-panel .oc-hint,
+.oc-bundle-panel .oc-qty-hint { color: #777; font-size: 12px; }
+.oc-bundle-panel .oc-hint { margin: 0 0 12px; }
+
+/* Pricing radios — spaced out */
+.oc-bundle-panel .oc-radios { display: inline-flex; flex-wrap: wrap; gap: 18px; }
+.oc-bundle-panel .oc-radio { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
+.oc-bundle-panel .oc-radio input[type="radio"] { margin: 0; }
+.oc-bundle-panel .oc-inline-select { margin-inline-end: 8px; }
+.oc-bundle-panel .oc-discount-value { width: 90px; }
+
+/* Components list — gray backdrop so each card stands apart */
+.oc-components-list {
+	background: #f0f0f1;
+	border-radius: 8px;
+	padding: 12px;
+	margin-bottom: 12px;
+}
+.oc-components-list:empty { padding: 0; }
+
+/* Component card */
+.oc-component-group {
+	background: #fff;
+	border: 1px solid #e2e4e7;
+	border-radius: 8px;
+	margin-bottom: 12px;
+	box-shadow: 0 1px 2px rgba(0,0,0,.04);
+	overflow: hidden;
+}
+.oc-component-group:last-child { margin-bottom: 0; }
+
+/* Card header doubles as the drag handle */
+.oc-card-head {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	background: #f6f7f7;
+	border-bottom: 1px solid #e2e4e7;
+	padding: 8px 12px;
+	cursor: move;
+	user-select: none;
+}
+.oc-card-grip { color: #8a8f94; }
+.oc-card-title { font-weight: 600; color: #1d2327; font-size: 13px; }
+.oc-card-head .oc-collapse-row { margin-inline-start: auto; }
+.oc-card-head .oc-remove-row { margin-inline-start: 8px; }
+.oc-collapse-row {
+	color: #50575e;
+	text-decoration: none;
+	font-size: 20px;
+	line-height: 1;
+	width: 22px;
+	height: 22px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 4px;
+}
+.oc-collapse-row:hover { background: #f0f0f1; color: #1d2327; }
+
+/* Collapsed card: show only the header */
+.oc-component-group.is-collapsed .oc-card-body,
+.oc-component-group.is-collapsed .oc-swaps-block { display: none !important; }
+.oc-component-group.is-collapsed .oc-card-head { border-bottom: none; }
+
+.oc-bundle-panel .oc-card-body { padding: 14px 14px 22px !important; background: #fff; }
+
+/* Fields row: product name | variation | quantity */
+.oc-card-fields {
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	flex-wrap: wrap;
+}
+.oc-field { display: flex; flex-direction: column; gap: 4px; }
+.oc-field-label { font-size: 11px; color: #777; }
+.oc-field-product { flex: 1 1 180px; min-width: 140px; }
+.oc-field-variation { flex: 1 1 190px; min-width: 140px; max-width: 280px; }
+.oc-field-qty { flex: 0 0 auto; }
+
+/* The qty cell is a transparent wrapper so its fields join the row directly */
+.oc-qty-cell { display: contents; }
+.oc-qty-input-wrap { display: inline-flex; align-items: center; gap: 6px; }
+.oc-qty-input { width: 72px; }
+.oc-qty-suffix { color: #333; font-weight: 600; }
+.oc-qty-hint { color: #777; font-size: 11px; white-space: nowrap; }
+.oc-weight-select { min-width: 0; width: 100%; }
+.oc-qty-empty { color: #999; font-style: italic; align-self: center; }
+
+/* Options stack: each toggle on its own row, with its content beneath it.
+   Higher specificity + !important to override WooCommerce's
+   `.woocommerce_options_panel label { float:left; width:150px }`. */
+.oc-bundle-panel .oc-card-options {
+	display: flex !important;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 12px;
+	margin-top: 14px;
+	padding-top: 12px;
+	border-top: 1px dashed #ececec;
+}
+.oc-bundle-panel .oc-toggle {
+	display: inline-flex !important;
+	align-items: center;
+	gap: 9px;
+	cursor: pointer;
+	user-select: none;
+	float: none !important;
+	width: auto !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	line-height: 1.2 !important;
+	position: relative;
+}
+.oc-bundle-panel .oc-toggle .oc-switch { position: absolute; opacity: 0; width: 0; height: 0; margin: 0; }
+.oc-bundle-panel .oc-toggle-ui {
+	display: inline-block !important;
+	flex: 0 0 auto;
+	width: 38px !important;
+	height: 22px !important;
+	background: #c9ccd1;
+	border-radius: 999px;
+	position: relative;
+	transition: background .2s ease;
+	float: none !important;
+}
+.oc-bundle-panel .oc-toggle-ui::after {
+	content: '';
+	position: absolute;
+	top: 2px;
+	inset-inline-start: 2px;
+	width: 18px;
+	height: 18px;
+	background: #fff;
+	border-radius: 50%;
+	box-shadow: 0 1px 2px rgba(0,0,0,.3);
+	transition: inset-inline-start .2s ease;
+}
+.oc-bundle-panel .oc-switch:checked + .oc-toggle-ui { background: #13433a; }
+.oc-bundle-panel .oc-switch:checked + .oc-toggle-ui::after { inset-inline-start: 18px; }
+.oc-bundle-panel .oc-switch:focus + .oc-toggle-ui { box-shadow: 0 0 0 2px rgba(19,67,58,.25); }
+.oc-bundle-panel .oc-toggle-text {
+	display: inline-block !important;
+	float: none !important;
+	width: auto !important;
+	font-size: 13px;
+	color: #1d2327;
+	line-height: 1.2;
+}
+
+/* Short description input (sits between the two toggles, on white) */
+.oc-bundle-panel .oc-card-desc { width: 100%; margin: 0; background: #fff; }
+.oc-bundle-panel .oc-card-desc .oc-desc-input { width: 100%; background: #fff; }
+
+/* Mobile / tablet: stack the fields */
+@media ( max-width: 900px ) {
+	.oc-field-product,
+	.oc-field-variation,
+	.oc-field-qty { flex: 1 1 100%; min-width: 0; }
+	.oc-qty-input { width: 120px; }
+}
+
+/* Swaps block — nested, lighter */
+.oc-swaps-block { background: #fbfbfc; border-top: 1px solid #e8e8ea; padding: 14px; margin-top: 8px; }
+.oc-swaps-title { display: block; font-weight: 600; margin-bottom: 8px; font-size: 12px; color: #50575e; }
+.oc-swaps-table { width: 100%; border-collapse: collapse; }
+.oc-swaps-table td { padding: 4px 6px; vertical-align: middle; }
+.oc-swap-product { width: 60%; }
+.oc-swap-surcharge-cell { white-space: nowrap; }
+.oc-swap-surcharge-cell .oc-surcharge-label { color: #777; font-size: 12px; margin-inline-end: 4px; }
+.oc-swap-surcharge-cell input { width: 90px; }
+.oc-swap-remove { text-align: center; width: 30px; }
+
+.oc-remove-row { color: #b32d2e; text-decoration: none; font-size: 18px; line-height: 1; }
+.oc-bundle-panel .oc-add-component,
+.oc-bundle-panel .oc-add-swap { margin-top: 4px; }
+
+/* Drag placeholder / helper */
+.oc-sort-placeholder {
+	border: 2px dashed #b4c7e7;
+	background: #e9f0fb;
+	border-radius: 8px;
+	margin-bottom: 12px;
+}
+.oc-component-group.ui-sortable-helper {
+	box-shadow: 0 8px 24px rgba(0,0,0,.18);
+}
+
+/* Weighed quantities on the order screen */
+.oc-order-actuals { margin-top: 10px; padding-top: 8px; border-top: 1px solid #e0e0e0; }
+.oc-order-actuals-table { width: 100%; margin: 6px 0; border-collapse: collapse; }
+.oc-order-actuals-table td { padding: 3px 6px 3px 0; vertical-align: middle; border: 0; }
+.oc-order-actuals-table .oc-actual-input { width: 90px; }
+.oc-order-actuals-table .oc-actual-taken { color: #646970; font-size: 12px; text-align: end; }

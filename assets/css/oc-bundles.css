@@ -1,0 +1,330 @@
+/* Original Concepts Bundles — frontend
+   Theme-agnostic, RTL-first. Visual direction matches the deliz storefront:
+   deep forest green, white cards, prominent quantity badges. */
+
+.oc-bundle {
+	--oc-green: #13433a;
+	--oc-green-soft: #e7efec;
+	--oc-ink: #1a1a1a;
+	--oc-muted: #6b7280;
+	--oc-line: #ececec;
+	--oc-radius: 16px;
+	text-align: start;
+	display: flex;
+	gap: 40px;
+	align-items: flex-start;
+	max-width: 1200px;
+	margin: 0 auto;
+}
+
+/* ---- Media column ---- */
+.oc-bundle-media {
+	flex: 1 1 50%;
+	min-width: 0;
+	position: sticky;
+	top: 24px;
+}
+.oc-bundle-media img {
+	width: 100%;
+	height: auto;
+	border-radius: var(--oc-radius);
+	display: block;
+	object-fit: cover;
+}
+
+/* ---- Body column ---- */
+.oc-bundle-body {
+	flex: 1 1 50%;
+	min-width: 0;
+}
+.oc-bundle-title {
+	color: var(--oc-green);
+	font-weight: 700;
+	font-size: 2rem;
+	margin: 0 0 8px;
+	line-height: 1.15;
+}
+.oc-bundle-price {
+	color: var(--oc-green);
+	font-weight: 700;
+	font-size: 1.6rem;
+	margin-bottom: 14px;
+}
+.oc-bundle-price del { color: var(--oc-muted); font-weight: 400; font-size: 1rem; margin-inline-start: 8px; }
+
+/* Discounted bundle: sale price + struck regular, each with a caption */
+.oc-bundle-price.has-discount {
+	display: flex;
+	align-items: baseline;
+	flex-wrap: wrap;
+	gap: 6px 14px;
+	font-size: 1rem;
+	margin-bottom: 14px;
+}
+.oc-bundle-price.has-discount .oc-price-current,
+.oc-bundle-price.has-discount .oc-price-was {
+	display: inline-flex;
+	flex-direction: column;
+	line-height: 1.15;
+}
+.oc-bundle-price.has-discount .oc-price-was {
+	text-decoration: none; /* the caption shouldn't be struck */
+}
+.oc-bundle-price.has-discount .oc-price-label {
+	font-size: 0.72rem;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+	color: var(--oc-muted);
+}
+.oc-bundle-price.has-discount .oc-price-current .oc-price-amount {
+	color: var(--oc-green);
+	font-weight: 700;
+	font-size: 1.6rem;
+}
+.oc-bundle-price.has-discount .oc-price-was .oc-price-amount {
+	color: var(--oc-muted);
+	font-weight: 400;
+	font-size: 1.15rem;
+	text-decoration: line-through;
+}
+.oc-bundle-desc {
+	color: var(--oc-muted);
+	line-height: 1.7;
+	margin-bottom: 20px;
+}
+.oc-bundle-desc-list { margin: 0; padding-inline-start: 18px; }
+
+.oc-bundle-components-head {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	border-top: 1px solid var(--oc-line);
+	padding-top: 20px;
+	margin-bottom: 16px;
+}
+.oc-bundle-components-title { font-weight: 700; font-size: 1.15rem; }
+.oc-bundle-count {
+	font-size: 0.8rem;
+	color: var(--oc-muted);
+	background: #f1f1f1;
+	border-radius: 999px;
+	padding: 2px 10px;
+}
+
+/* ---- Components grid / list ---- */
+.oc-components { display: grid; gap: 16px; }
+.oc-layout-grid .oc-components { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.oc-layout-list .oc-components { grid-template-columns: 1fr; }
+
+.oc-component {
+	display: flex;
+	gap: 14px;
+	background: #fff;
+	border: 1px solid var(--oc-line);
+	border-radius: 14px;
+	padding: 10px;
+	align-items: center;
+}
+.oc-layout-grid .oc-component { flex-direction: column; align-items: stretch; text-align: center; }
+
+.oc-component-media { position: relative; }
+.oc-layout-list .oc-component-media { flex: 0 0 84px; }
+.oc-component-media img {
+	width: 100%;
+	border-radius: 10px;
+	display: block;
+	aspect-ratio: 1 / 1;
+	object-fit: cover;
+}
+.oc-layout-list .oc-component-media img { width: 84px; height: 84px; }
+
+.oc-qty-pill {
+	display: inline-block;
+	align-self: flex-start;
+	background: var(--oc-green);
+	color: #fff;
+	font-weight: 700;
+	font-size: 0.82rem;
+	line-height: 1;
+	padding: 5px 11px;
+	border-radius: 999px;
+	white-space: nowrap;
+	margin-bottom: 2px;
+}
+.oc-layout-grid .oc-qty-pill { align-self: center; }
+
+.oc-component-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.oc-layout-grid .oc-component-info { align-items: center; }
+.oc-component-name { font-weight: 600; color: var(--oc-ink); }
+.oc-component-desc { color: var(--oc-muted); font-size: 0.85rem; line-height: 1.4; }
+.oc-swap-link {
+	color: var(--oc-green);
+	text-decoration: underline;
+	font-size: 0.85rem;
+	cursor: pointer;
+}
+.oc-swap-empty { color: var(--oc-muted); text-align: center; padding: 16px 0; }
+
+/* ---- Footer (qty + add to cart) ---- */
+.oc-bundle-form { margin-top: 24px; }
+.oc-bundle-footer {
+	display: flex;
+	gap: 12px;
+	align-items: stretch;
+}
+.oc-qty {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	border: 1px solid var(--oc-line);
+	border-radius: 12px;
+	padding: 4px 8px;
+}
+.oc-qty-minus, .oc-qty-plus {
+	width: 34px; height: 34px;
+	border-radius: 50%;
+	border: none;
+	background: var(--oc-green);
+	color: #fff;
+	font-size: 1.1rem;
+	cursor: pointer;
+	line-height: 1;
+}
+.oc-qty-input {
+	width: 48px;
+	text-align: center;
+	border: none;
+	background: transparent;
+	font-weight: 600;
+	-moz-appearance: textfield;
+}
+.oc-qty-input::-webkit-outer-spin-button,
+.oc-qty-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.oc-qty-label { font-size: 0.8rem; color: var(--oc-muted); }
+
+.oc-add-to-cart {
+	flex: 1 1 auto;
+	background: var(--oc-green) !important;
+	color: #fff !important;
+	border: none !important;
+	border-radius: 12px !important;
+	display: flex !important;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	font-weight: 700;
+	padding: 0 20px !important;
+}
+.oc-bundle-oos { color: #b32d2e; font-weight: 600; }
+
+/* ---- Swap popup ---- */
+.oc-swap-overlay {
+	position: fixed;
+	inset: 0;
+	background: rgba(0,0,0,.5);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 99999;
+}
+.oc-swap-modal {
+	background: #fff;
+	width: min(560px, 92vw);
+	max-height: 86vh;
+	overflow: auto;
+	border-radius: var(--oc-radius, 16px);
+	padding: 22px;
+}
+.oc-swap-head {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 16px;
+}
+.oc-swap-title { font-weight: 700; font-size: 1.1rem; color: #13433a; }
+.oc-swap-close { background: none; border: none; font-size: 1.4rem; cursor: pointer; line-height: 1; }
+.oc-swap-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.oc-swap-option {
+	border: 2px solid #ececec;
+	border-radius: 14px;
+	padding: 10px;
+	text-align: center;
+	cursor: pointer;
+	position: relative;
+}
+.oc-swap-option.is-selected { border-color: #13433a; }
+.oc-swap-option.is-disabled { opacity: .5; pointer-events: none; }
+.oc-swap-thumbs img { width: 100%; border-radius: 10px; aspect-ratio: 1/1; object-fit: cover; }
+.oc-swap-thumbs.is-multi { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.oc-swap-name { display: block; margin-top: 8px; font-weight: 600; font-size: .9rem; }
+.oc-swap-surcharge {
+	position: absolute; top: 8px; inset-inline-start: 8px;
+	background: #13433a; color: #fff; border-radius: 999px;
+	font-size: .75rem; padding: 3px 8px; font-weight: 700;
+}
+.oc-swap-surcharge.oc-neg { background: #6b7280; }
+.oc-swap-oos { display: block; font-size: .75rem; color: #b32d2e; margin-top: 4px; }
+.oc-swap-apply {
+	margin-top: 18px;
+	width: 100%;
+	background: #13433a;
+	color: #fff;
+	border: none;
+	border-radius: 12px;
+	padding: 12px;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+/* ---- Mobile ---- */
+@media (max-width: 768px) {
+	.oc-bundle { flex-direction: column; gap: 18px; }
+	.oc-bundle-media { position: static; flex-basis: auto; }
+	.oc-bundle-title { font-size: 1.5rem; }
+	.oc-layout-grid .oc-components { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+	.oc-swap-grid { grid-template-columns: repeat(2, 1fr); }
+
+	/* Sticky add-to-cart bar on mobile */
+	.oc-bundle-form {
+		position: sticky;
+		bottom: 0;
+		background: #fff;
+		padding: 12px 0;
+		margin: 24px -16px 0;
+		padding-inline: 16px;
+		border-top: 1px solid var(--oc-line);
+		box-shadow: 0 -4px 16px rgba(0,0,0,.06);
+		z-index: 50;
+	}
+}
+
+/* Bundle contents inside cart / mini-cart lines.
+   Block-based carts sanitise item-data HTML and drop inline style attributes, so
+   the layout has to exist here as classes too. The inline copy in
+   Helpers::components_rows_html() is what survives in e-mail, where no
+   stylesheet is loaded — the two are kept deliberately in sync. */
+.oc-cart-lines { display: block; }
+.oc-cart-line {
+	display: flex;
+	align-items: flex-start;
+	gap: 6px;
+	line-height: 1.5;
+	margin: 0 0 4px;
+}
+.oc-cart-qty {
+	flex: 0 0 auto;
+	background: #eef3f0;
+	color: #13433a;
+	border-radius: 4px;
+	padding: 1px 6px;
+	font-weight: 600;
+	font-size: .92em;
+	text-align: center;
+	white-space: nowrap;
+}
+.oc-cart-name {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow-wrap: anywhere;
+}

@@ -1,0 +1,45 @@
+/* Original Concepts Bundles — in-popup layout overrides for the deliz theme.
+ *
+ * The base .oc-bundle is the single-product layout: a two-column flex row of
+ * media | body, centred at 1200px. Inside the theme's modal there is only one
+ * narrow column, so the block has to stack — otherwise the components heading
+ * ends up beside the grid instead of above it.
+ */
+
+.ed-product-popup .oc-bundle--in-popup {
+	display: block;
+	gap: 0;
+	max-width: none;
+	margin: 0;
+}
+
+.ed-product-popup .oc-bundle--in-popup .oc-bundle-components-head {
+	display: flex;
+	align-items: center;
+	justify-content: flex-start;
+	gap: 10px;
+	width: 100%;
+	margin: 0 0 14px;
+	padding-top: 16px;
+}
+
+.ed-product-popup .oc-bundle--in-popup .oc-components {
+	width: 100%;
+}
+
+/* The swap chooser is appended to <body>, so it cannot be scoped to the popup.
+   The theme's modal sits at z-index 99999999 while the plugin's overlay ships
+   at 99999 — fine on the single-product page, but inside the modal it lands
+   underneath. This stylesheet only loads for the deliz theme, so raising it
+   here does not affect other themes. */
+.oc-swap-overlay {
+	z-index: 100000000;
+}
+
+/* Single column on narrow screens — two product cards side by side
+   get too cramped in the modal. */
+@media (max-width: 480px) {
+	.ed-product-popup .oc-bundle--in-popup.oc-layout-grid .oc-components {
+		grid-template-columns: 1fr;
+	}
+}

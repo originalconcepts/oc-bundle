@@ -1,0 +1,243 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Original Concepts Bundles 1.0.0\n"
+"Report-Msgid-Bugs-To: https://originalconcepts.co.il/\n"
+"POT-Creation-Date: 2026-06-16 09:44+0000\n"
+"PO-Revision-Date: 2026-06-16 09:44+0000\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Domain: oc-bundles\n"
+
+msgctxt "units suffix"
+msgid "pcs"
+msgstr ""
+
+msgid "%d item"
+msgid_plural "%d items"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Add alternative"
+msgstr ""
+
+msgid "Add product"
+msgstr ""
+
+msgid "Add short description"
+msgstr ""
+
+msgid "Add to cart"
+msgstr ""
+
+msgid "Alternative products"
+msgstr ""
+
+msgid "Alternative product…"
+msgstr ""
+
+msgid "Bundle"
+msgstr ""
+
+msgid "Bundle components"
+msgstr ""
+
+msgid "Bundle contents"
+msgstr ""
+
+msgid "Bundle discount"
+msgstr ""
+
+msgid "Bundle item"
+msgstr ""
+
+msgid "Bundle line (default)"
+msgstr ""
+
+msgid "Bundle name + product list"
+msgstr ""
+
+msgid "Bundle name only"
+msgstr ""
+
+msgid "Cart display"
+msgstr ""
+
+msgid "Choose a product first"
+msgstr ""
+
+msgid "Choose an alternative product"
+msgstr ""
+
+msgid "Close"
+msgstr ""
+
+msgid "Component breakdown"
+msgstr ""
+
+msgid "Component layout"
+msgstr ""
+
+msgid "Component not found."
+msgstr ""
+
+msgid "Confirm swap"
+msgstr ""
+
+msgid "Decrease quantity"
+msgstr ""
+
+msgid "Display & stock"
+msgstr ""
+
+msgid "Each unit ≈ %s kg"
+msgstr ""
+
+msgid "Fixed amount"
+msgstr ""
+
+msgid "Fixed bundle price"
+msgstr ""
+
+msgid "Fixed price"
+msgstr ""
+
+msgid "Grid"
+msgstr ""
+
+msgid "Increase quantity"
+msgstr ""
+
+msgid "Invoice display"
+msgstr ""
+
+msgid "List"
+msgstr ""
+
+msgid "Mark the bundle as unavailable"
+msgstr ""
+
+msgid "No alternative products available."
+msgstr ""
+
+msgid "None"
+msgstr ""
+
+msgid "Not enough stock for the requested bundle quantity."
+msgstr ""
+
+msgid "Out of stock"
+msgstr ""
+
+msgid "Percentage (%)"
+msgstr ""
+
+msgid "Pricing"
+msgstr ""
+
+msgid "Pricing method"
+msgstr ""
+
+msgid "Product name"
+msgstr ""
+
+msgid "Quantity"
+msgstr ""
+
+msgid "Remove product"
+msgstr ""
+
+msgid "Search for a product…"
+msgstr ""
+
+msgid "Short description shown under the product name…"
+msgstr ""
+
+msgid "Show the product list in the description"
+msgstr ""
+
+msgid "Sum of the products"
+msgstr ""
+
+msgid "Surcharge ₪"
+msgstr ""
+
+msgid "Swap"
+msgstr ""
+
+msgid "Swap automatically"
+msgstr ""
+
+msgid "Swappable"
+msgstr ""
+
+msgid "The \"Bundles\" add-on requires WooCommerce to be active."
+msgstr ""
+
+msgid ""
+"The unit and quantity are set automatically from the product settings "
+"(weight / units)."
+msgstr ""
+
+msgid "Variation"
+msgstr ""
+
+msgid "What's in the bundle"
+msgstr ""
+
+msgid "When a component is out of stock"
+msgstr ""
+
+msgid "g"
+msgstr ""
+
+msgid "kg"
+msgstr ""
+
+msgid "Minimize"
+msgstr ""
+
+msgid "Expand"
+msgstr ""
+
+msgid "Remove this product from the bundle?"
+msgstr ""
+
+msgid "Remove this alternative product?"
+msgstr ""
+
+msgid "Bundle sale price"
+msgstr ""
+
+msgid "Regular price"
+msgstr ""
+
+msgid "Bundle price"
+msgstr ""
+
+msgid "Hide the price captions on the product page (show prices only)"
+msgstr ""
+
+msgid "Bundle name + product list on one line"
+msgstr ""
+
+msgid "SKU"
+msgstr ""
+
+msgid "Note"
+msgstr ""
+
+msgid "Weighed quantities"
+msgstr ""
+
+msgid "taken from stock: %s"
+msgstr ""
+
+msgid "Leave empty to use the ordered quantity. Saving adjusts stock by the difference only."
+msgstr ""
+
+msgid "Update the price when quantities are re-weighed on the order"
+msgstr ""

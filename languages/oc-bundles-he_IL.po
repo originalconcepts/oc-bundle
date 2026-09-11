@@ -1,0 +1,243 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Original Concepts Bundles 1.0.0\n"
+"Report-Msgid-Bugs-To: https://originalconcepts.co.il/\n"
+"POT-Creation-Date: 2026-06-16 09:44+0000\n"
+"PO-Revision-Date: 2026-06-16 09:44+0000\n"
+"Language: he_IL\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Domain: oc-bundles\n"
+
+msgctxt "units suffix"
+msgid "pcs"
+msgstr "יח'"
+
+msgid "%d item"
+msgid_plural "%d items"
+msgstr[0] "%d פריט"
+msgstr[1] "%d פריטים"
+
+msgid "Add alternative"
+msgstr "הוסף חלופה"
+
+msgid "Add product"
+msgstr "הוסף מוצר"
+
+msgid "Add short description"
+msgstr "הוסף תיאור קצר"
+
+msgid "Add to cart"
+msgstr "הוסף לסל"
+
+msgid "Alternative products"
+msgstr "מוצרים חלופיים"
+
+msgid "Alternative product…"
+msgstr "מוצר חלופי…"
+
+msgid "Bundle"
+msgstr "מארז"
+
+msgid "Bundle components"
+msgstr "רכיבי המארז"
+
+msgid "Bundle contents"
+msgstr "הרכב המארז"
+
+msgid "Bundle discount"
+msgstr "הנחה למארז"
+
+msgid "Bundle item"
+msgstr "מוצר במארז"
+
+msgid "Bundle line (default)"
+msgstr "שורת מארז (ברירת מחדל)"
+
+msgid "Bundle name + product list"
+msgstr "שם המארז + רשימת מוצרים"
+
+msgid "Bundle name only"
+msgstr "שם המארז בלבד"
+
+msgid "Cart display"
+msgstr "תצוגה בסל"
+
+msgid "Choose a product first"
+msgstr "בחר מוצר תחילה"
+
+msgid "Choose an alternative product"
+msgstr "בחר מוצר חלופי"
+
+msgid "Close"
+msgstr "סגור"
+
+msgid "Component breakdown"
+msgstr "פירוט רכיבים"
+
+msgid "Component layout"
+msgstr "פריסת רכיבים"
+
+msgid "Component not found."
+msgstr "רכיב לא נמצא."
+
+msgid "Confirm swap"
+msgstr "אישור החלפה"
+
+msgid "Decrease quantity"
+msgstr "הפחת"
+
+msgid "Display & stock"
+msgstr "תצוגה ומלאי"
+
+msgid "Each unit ≈ %s kg"
+msgstr "כל יחידה ≈ %s ק\"ג"
+
+msgid "Fixed amount"
+msgstr "סכום (₪)"
+
+msgid "Fixed bundle price"
+msgstr "מחיר קבוע למארז"
+
+msgid "Fixed price"
+msgstr "מחיר קבוע"
+
+msgid "Grid"
+msgstr "גריד (קוביות)"
+
+msgid "Increase quantity"
+msgstr "הוסף"
+
+msgid "Invoice display"
+msgstr "תצוגה בחשבונית"
+
+msgid "List"
+msgstr "רשימה"
+
+msgid "Mark the bundle as unavailable"
+msgstr "הפוך מארז ללא זמין"
+
+msgid "No alternative products available."
+msgstr "אין מוצרים חלופיים זמינים."
+
+msgid "None"
+msgstr "ללא"
+
+msgid "Not enough stock for the requested bundle quantity."
+msgstr "אין מספיק מלאי לכמות המבוקשת מהמארז."
+
+msgid "Out of stock"
+msgstr "אזל מהמלאי"
+
+msgid "Percentage (%)"
+msgstr "אחוז (%)"
+
+msgid "Pricing"
+msgstr "תמחור"
+
+msgid "Pricing method"
+msgstr "אופן תמחור"
+
+msgid "Product name"
+msgstr "שם המוצר"
+
+msgid "Quantity"
+msgstr "כמות"
+
+msgid "Remove product"
+msgstr "הסר מוצר"
+
+msgid "Search for a product…"
+msgstr "חיפוש מוצר…"
+
+msgid "Short description shown under the product name…"
+msgstr "תיאור קצר שיוצג מתחת לשם המוצר…"
+
+msgid "Show the product list in the description"
+msgstr "הצג רשימת מוצרים בתיאור"
+
+msgid "Sum of the products"
+msgstr "לפי סכום המוצרים"
+
+msgid "Surcharge ₪"
+msgstr "תוספת ₪"
+
+msgid "Swap"
+msgstr "החלף מוצר"
+
+msgid "Swap automatically"
+msgstr "החלף מוצר אוטומטית"
+
+msgid "Swappable"
+msgstr "ניתן להחלפה"
+
+msgid "The \"Bundles\" add-on requires WooCommerce to be active."
+msgstr "תוסף \"מארזים\" דורש את WooCommerce פעיל."
+
+msgid ""
+"The unit and quantity are set automatically from the product settings "
+"(weight / units)."
+msgstr "היחידה והכמות נקבעות אוטומטית לפי הגדרות המוצר (משקל / יחידות)."
+
+msgid "Variation"
+msgstr "וריאציה"
+
+msgid "What's in the bundle"
+msgstr "מה במארז"
+
+msgid "When a component is out of stock"
+msgstr "כשרכיב אזל מהמלאי"
+
+msgid "g"
+msgstr "גרם"
+
+msgid "kg"
+msgstr "ק\"ג"
+
+msgid "Minimize"
+msgstr "מזער"
+
+msgid "Expand"
+msgstr "הרחב"
+
+msgid "Remove this product from the bundle?"
+msgstr "להסיר את המוצר מהמארז?"
+
+msgid "Remove this alternative product?"
+msgstr "להסיר את המוצר החלופי?"
+
+msgid "Bundle sale price"
+msgstr "מבצע מחיר מארז"
+
+msgid "Regular price"
+msgstr "מחיר רגיל"
+
+msgid "Bundle price"
+msgstr "מחיר מארז"
+
+msgid "Hide the price captions on the product page (show prices only)"
+msgstr "הסתר טקסט מחיר מארז ומחיר רגיל"
+
+msgid "Bundle name + product list on one line"
+msgstr "שם המארז + רשימת מוצרים בשורה אחת"
+
+msgid "SKU"
+msgstr "מק״ט"
+
+msgid "Note"
+msgstr "הערה"
+
+msgid "Weighed quantities"
+msgstr "כמויות בפועל (שקילה)"
+
+msgid "taken from stock: %s"
+msgstr "ירד מהמלאי: %s"
+
+msgid "Leave empty to use the ordered quantity. Saving adjusts stock by the difference only."
+msgstr "השאר ריק כדי להשתמש בכמות שהוזמנה. שמירה מעדכנת את המלאי רק בהפרש."
+
+msgid "Update the price when quantities are re-weighed on the order"
+msgstr "עדכן את המחיר כשהכמויות נשקלות מחדש בהזמנה"

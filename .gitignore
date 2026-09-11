@@ -1,0 +1,19 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
+
+# Dependencies / build (none required, but keep the repo clean)
+node_modules/
+vendor/
+*.log
+
+# Local build artifacts (release zips are attached to GitHub Releases, not committed)
+/build/
+*.zip
+
+# Keep compiled translations tracked (.mo IS committed — WordPress needs it at runtime)
+# (do not ignore languages/*.mo)
