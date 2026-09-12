@@ -43,3 +43,26 @@
 		grid-template-columns: 1fr;
 	}
 }
+
+/* Mini-cart ("float cart") bundle contents.
+ *
+ * The theme lays each cart row out as a flex: thumbnail + details + actions, and
+ * pins the details column to a fixed `flex: 0 0 ~79px`. The bundle contents render
+ * inside that column, which leaves the product name about 32px -- far narrower than
+ * a single Hebrew word, so every name collapsed into one character per line.
+ *
+ * The row itself is ~339px. `display: contents` on the details wrapper promotes its
+ * children to flex items of the row, so the contents block can take a full-width
+ * line of its own beneath the name. Measured: name column 32px -> 292px, and every
+ * component fits on one line.
+ */
+/* !important is deliberate: the theme stylesheet loads after the plugin's and sets
+ * the details column's flex-basis itself, so an equal-specificity rule loses. */
+.ed-float-cart__item .cart_item_inner { flex-wrap: wrap !important; }
+.ed-float-cart__item .ed-float-cart__details { display: contents !important; }
+.ed-float-cart__item .ed-float-cart__meta2 {
+	flex: 1 0 100% !important;
+	width: 100% !important;
+	min-width: 0;
+	margin-top: 6px;
+}

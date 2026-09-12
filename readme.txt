@@ -4,7 +4,7 @@ Requires at least: 6.2
 Tested up to: 6.8
 Requires PHP: 7.4
 WC requires at least: 7.0
-Stable tag: 1.4.0
+Stable tag: 1.4.1
 License: GPL-2.0+
 
 WooCommerce product bundles: a "Bundle" product type made of products and
@@ -63,6 +63,15 @@ For a private repo or to avoid GitHub rate limits, add a token:
        define( 'OC_BUNDLES_GITHUB_TOKEN', 'ghp_xxx' );
 
 == Changelog ==
+
+= 1.4.1 =
+* Fixed bundle contents in the mini-cart. The theme pins its cart-row detail column
+  to a fixed width, which left the product name about 32px -- narrower than a single
+  Hebrew word -- so names broke one character per line. The contents block now takes
+  a full-width line of its own inside the cart row, and every component fits on one
+  line as "quantity + name". Measured on deliz.co.il: name column 32px -> 292px.
+* Core cart styles no longer use `overflow-wrap: anywhere` with a zero min-width,
+  which is what allowed the mid-word breaking in the first place.
 
 = 1.4.0 =
 * Merged the Deliz product-popup module into the plugin, and moved the cart-line

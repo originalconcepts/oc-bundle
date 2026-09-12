@@ -307,7 +307,7 @@
 .oc-cart-lines { display: block; }
 .oc-cart-line {
 	display: flex;
-	align-items: flex-start;
+	align-items: baseline;
 	gap: 6px;
 	line-height: 1.5;
 	margin: 0 0 4px;
@@ -324,7 +324,11 @@
 	white-space: nowrap;
 }
 .oc-cart-name {
+	/* No `min-width: 0` and no `overflow-wrap: anywhere` on purpose: together they let
+	   the flex item shrink to nothing and then break the product name one character
+	   per line in a narrow column. Keeping the min-content floor means the name stays
+	   in whole words, and a theme that gives it too little room gets an overflow
+	   rather than shredded text. */
 	flex: 1 1 auto;
-	min-width: 0;
-	overflow-wrap: anywhere;
+	overflow-wrap: break-word;
 }
