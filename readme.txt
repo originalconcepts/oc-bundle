@@ -4,7 +4,7 @@ Requires at least: 6.2
 Tested up to: 6.8
 Requires PHP: 7.4
 WC requires at least: 7.0
-Stable tag: 1.4.1
+Stable tag: 1.4.2
 License: GPL-2.0+
 
 WooCommerce product bundles: a "Bundle" product type made of products and
@@ -63,6 +63,13 @@ For a private repo or to avoid GitHub rate limits, add a token:
        define( 'OC_BUNDLES_GITHUB_TOKEN', 'ghp_xxx' );
 
 == Changelog ==
+
+= 1.4.2 =
+* Mini-cart: the bundle's quantity and price now stay on the first row beside the
+  thumbnail and name, with the contents listed underneath, instead of being pushed
+  below the list.
+* Bundle contents no longer sit flush against the product image in the block-based
+  cart, which had no padding of its own on that edge.
 
 = 1.4.1 =
 * Fixed bundle contents in the mini-cart. The theme pins its cart-row detail column

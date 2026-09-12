@@ -311,6 +311,9 @@
 	gap: 6px;
 	line-height: 1.5;
 	margin: 0 0 4px;
+	/* The block-based cart puts the product image hard against this cell and gives it
+	   no padding of its own, so the contents would otherwise touch the image. */
+	padding-inline-start: 10px;
 }
 .oc-cart-qty {
 	flex: 0 0 auto;

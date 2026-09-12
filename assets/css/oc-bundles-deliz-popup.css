@@ -61,8 +61,17 @@
 .ed-float-cart__item .cart_item_inner { flex-wrap: wrap !important; }
 .ed-float-cart__item .ed-float-cart__details { display: contents !important; }
 .ed-float-cart__item .ed-float-cart__meta2 {
+	/* Ordered last so the quantity and price stay up on the first row beside the
+	   thumbnail and name, with the contents on their own line underneath. */
+	order: 99 !important;
 	flex: 1 0 100% !important;
 	width: 100% !important;
 	min-width: 0;
 	margin-top: 6px;
 }
+
+/* display:contents removes the details wrapper's box, and with it the inset that
+ * used to separate the item name from the thumbnail. Scoped with :has() to rows
+ * that actually carry bundle contents, so the theme's own (tightly fitted) rows
+ * are left alone. */
+.ed-float-cart__item:has(.oc-cart-line) .ed-float-cart__name { margin-inline-start: 8px; }
