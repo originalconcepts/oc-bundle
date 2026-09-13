@@ -4,7 +4,7 @@ Requires at least: 6.2
 Tested up to: 6.8
 Requires PHP: 7.4
 WC requires at least: 7.0
-Stable tag: 1.4.2
+Stable tag: 1.4.3
 License: GPL-2.0+
 
 WooCommerce product bundles: a "Bundle" product type made of products and
@@ -63,6 +63,16 @@ For a private repo or to avoid GitHub rate limits, add a token:
        define( 'OC_BUNDLES_GITHUB_TOKEN', 'ghp_xxx' );
 
 == Changelog ==
+
+= 1.4.3 =
+* Reverted the mini-cart layout overrides added in 1.4.1/1.4.2. They reshaped the
+  theme's own cart row (display:contents on its detail wrapper, flex-wrap and
+  ordering on the row) to win width for the bundle contents. That is the theme's
+  layout to own, not the plugin's, and it moved the item's variations/meta and the
+  quantity and price out of their proper places. The theme now lays its cart row
+  out exactly as it did before the plugin was involved.
+* The plugin-side fixes are kept: contents no longer break mid-word, and they keep
+  a small inset from the product image.
 
 = 1.4.2 =
 * Mini-cart: the bundle's quantity and price now stay on the first row beside the
