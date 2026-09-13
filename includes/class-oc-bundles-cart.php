@@ -149,15 +149,18 @@ class OC_Bundles_Cart {
 
 		if ( 'line' === $config['cart_display'] ) {
 			$lines = OC_Bundles_Helpers::components_list_lines( $cart_item['oc_bundle']['components'] );
-			$value = empty( $lines ) ? '' : esc_html( implode( ' · ', $lines ) );
+			$value = empty( $lines ) ? '' : '<span class="oc-cart-inline">' . esc_html( implode( ' · ', $lines ) ) . '</span>';
 		} else {
 			$value = OC_Bundles_Helpers::components_rows_html( $cart_item['oc_bundle']['components'] );
 		}
 
 		if ( '' !== $value ) {
+			$label = __( "What's in the bundle", 'oc-bundles' );
+			// The class and label let a theme integration lift the contents out of a narrow
+			// cart column onto a line of their own (see assets/js/oc-bundles-deliz-cart.js).
 			$item_data[] = array(
-				'key'   => __( "What's in the bundle", 'oc-bundles' ),
-				'value' => $value,
+				'key'   => $label,
+				'value' => '<span class="oc-bundle-contents" data-oc-label="' . esc_attr( $label ) . '">' . $value . '</span>',
 			);
 		}
 		return $item_data;

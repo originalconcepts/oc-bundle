@@ -4,7 +4,7 @@ Requires at least: 6.2
 Tested up to: 6.8
 Requires PHP: 7.4
 WC requires at least: 7.0
-Stable tag: 1.4.3
+Stable tag: 1.4.4
 License: GPL-2.0+
 
 WooCommerce product bundles: a "Bundle" product type made of products and
@@ -63,6 +63,15 @@ For a private repo or to avoid GitHub rate limits, add a token:
        define( 'OC_BUNDLES_GITHUB_TOKEN', 'ghp_xxx' );
 
 == Changelog ==
+
+= 1.4.4 =
+* Deliz float cart: a bundle shown with its contents (as rows, or as a one-line list)
+  now keeps exactly the cart row every other product has — thumbnail, name, quantity
+  and price where the theme puts them — and lists its contents on a full-width line
+  under that row. The contents used to sit inside the theme's narrow name column,
+  widening it and pushing the quantity and price out of the cart with a sideways scroll.
+* Done in the plugin only: the cart item data carries a marker class and label, and a
+  small script moves just that block. No theme styles are overridden.
 
 = 1.4.3 =
 * Reverted the mini-cart layout overrides added in 1.4.1/1.4.2. They reshaped the

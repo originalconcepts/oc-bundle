@@ -75,6 +75,9 @@ assets/css/oc-bundles.css              Front styles (deliz green #13433A, RTL-sa
 assets/css/oc-bundles-admin.css        Admin card + toggle styles.
 assets/js/oc-bundles.js                Front: qty stepper, swap popup, live price.
 assets/js/oc-bundles-admin.js          Admin: component cards, sortable, qty cell.
+assets/css/oc-bundles-deliz-cart.css   Deliz float cart: full-width bundle contents line.
+assets/js/oc-bundles-deliz-cart.js     Deliz float cart: moves the plugin's contents block
+                                       out of the theme's narrow details column (plugin-only).
 languages/oc-bundles.pot               Source strings.
 languages/oc-bundles-he_IL.po/.mo      Hebrew translation (compiled).
 readme.txt                             Plugin readme.

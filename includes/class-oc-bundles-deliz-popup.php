@@ -13,6 +13,8 @@
  *   2. Appends a rendered components block to the popup REST payload.
  *   3. Copies the chosen swaps from the add-to-cart JSON body into $_POST,
  *      where OC_Bundles_Cart::add_cart_item_data expects to find them.
+ *   4. Gives a bundle's contents a full-width line under its float-cart row
+ *      instead of the theme's narrow details column (oc-bundles-deliz-cart.js).
  *
  * @package OC_Bundles
  */
@@ -118,6 +120,21 @@ class OC_Bundles_Deliz_Popup {
 			OC_BUNDLES_URL . 'assets/js/oc-bundles-deliz-popup.js',
 			array( 'jquery', 'oc-bundles' ),
 			self::asset_version( 'assets/js/oc-bundles-deliz-popup.js' ),
+			true
+		);
+
+		// The float cart is on every storefront view, not only where a popup opens.
+		wp_enqueue_style(
+			'oc-bundles-deliz-cart',
+			OC_BUNDLES_URL . 'assets/css/oc-bundles-deliz-cart.css',
+			array(),
+			self::asset_version( 'assets/css/oc-bundles-deliz-cart.css' )
+		);
+		wp_enqueue_script(
+			'oc-bundles-deliz-cart',
+			OC_BUNDLES_URL . 'assets/js/oc-bundles-deliz-cart.js',
+			array(),
+			self::asset_version( 'assets/js/oc-bundles-deliz-cart.js' ),
 			true
 		);
 	}
