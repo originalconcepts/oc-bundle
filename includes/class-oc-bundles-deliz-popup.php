@@ -244,7 +244,8 @@ class OC_Bundles_Deliz_Popup {
 			'base_price'      => (float) $base,
 			'discount_amount' => (float) $discount,
 			'price'           => (float) $price,
-			'price_html'      => wc_price( $price ),
+			// Discounted: regular struck through, then the sale price — WooCommerce's sale format.
+			'price_html'      => $discount > 0 ? wc_format_sale_price( wc_price( $price + $discount ), wc_price( $price ) ) : wc_price( $price ),
 			'layout'          => isset( $config['layout'] ) ? $config['layout'] : 'grid',
 			'count'           => count( $config['components'] ),
 			'selection'       => (object) $selection,

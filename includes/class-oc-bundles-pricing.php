@@ -15,13 +15,22 @@ class OC_Bundles_Pricing {
 	/** @var array<int,float> Cart-line prices by product object (spl_object_id => price). */
 	protected static $line_prices = array();
 
+	/** @var array<int,float> Cart-line regular (pre-discount) prices, same keys. */
+	protected static $line_regular = array();
+
 	public static function init() {
 		add_filter( 'woocommerce_product_get_price', array( __CLASS__, 'filter_price' ), 10, 2 );
-		add_filter( 'woocommerce_product_get_regular_price', array( __CLASS__, 'filter_price' ), 10, 2 );
+		// Regular = before the bundle discount, sale = after it. WooCommerce's own
+		// is_on_sale() and get_price_html() then show a discounted bundle like any product
+		// on sale: regular price struck through, sale price in the theme's sale colour.
+		add_filter( 'woocommerce_product_get_regular_price', array( __CLASS__, 'filter_regular_price' ), 10, 2 );
+		add_filter( 'woocommerce_product_get_sale_price', array( __CLASS__, 'filter_sale_price' ), 10, 2 );
 
 		// Keep a cart line at the price the cart computed for it, surcharges included.
 		add_action( 'woocommerce_before_calculate_totals', array( __CLASS__, 'capture_line_prices' ), 21 );
 		add_filter( 'woocommerce_product_get_price', array( __CLASS__, 'restore_line_price' ), 20, 2 );
+		add_filter( 'woocommerce_product_get_regular_price', array( __CLASS__, 'restore_line_regular_price' ), 20, 2 );
+		add_filter( 'woocommerce_product_get_sale_price', array( __CLASS__, 'restore_line_sale_price' ), 20, 2 );
 	}
 
 	/**
@@ -34,7 +43,8 @@ class OC_Bundles_Pricing {
 	 * @param WC_Cart $cart Cart.
 	 */
 	public static function capture_line_prices( $cart ) {
-		self::$line_prices = array();
+		self::$line_prices  = array();
+		self::$line_regular = array();
 
 		if ( ! $cart || ! is_a( $cart, 'WC_Cart' ) ) {
 			return;
@@ -47,7 +57,11 @@ class OC_Bundles_Pricing {
 			if ( ! is_object( $cart_item['data'] ) ) {
 				continue;
 			}
-			self::$line_prices[ spl_object_id( $cart_item['data'] ) ] = (float) $cart_item['oc_bundle']['unit_price'];
+			$key                       = spl_object_id( $cart_item['data'] );
+			self::$line_prices[ $key ] = (float) $cart_item['oc_bundle']['unit_price'];
+			// Swap surcharges are never discounted, so the line's regular price is simply its
+			// price plus the bundle discount.
+			self::$line_regular[ $key ] = self::$line_prices[ $key ] + self::discount_amount( $cart_item['product_id'] );
 		}
 	}
 
@@ -78,6 +92,43 @@ class OC_Bundles_Pricing {
 	}
 
 	/**
+	 * A cart line's regular price: its own price plus the bundle discount.
+	 *
+	 * @param string     $price   Price from the earlier filters.
+	 * @param WC_Product $product Product.
+	 * @return string
+	 */
+	public static function restore_line_regular_price( $price, $product ) {
+		if ( empty( self::$line_regular ) || ! $product || ! is_object( $product ) ) {
+			return $price;
+		}
+
+		$key = spl_object_id( $product );
+
+		return isset( self::$line_regular[ $key ] ) ? (string) self::$line_regular[ $key ] : $price;
+	}
+
+	/**
+	 * A cart line's sale price: its own price when the bundle is discounted, else none.
+	 *
+	 * @param string     $price   Price from the earlier filters.
+	 * @param WC_Product $product Product.
+	 * @return string
+	 */
+	public static function restore_line_sale_price( $price, $product ) {
+		if ( empty( self::$line_prices ) || ! $product || ! is_object( $product ) ) {
+			return $price;
+		}
+
+		$key = spl_object_id( $product );
+		if ( ! isset( self::$line_prices[ $key ], self::$line_regular[ $key ] ) ) {
+			return $price;
+		}
+
+		return self::$line_regular[ $key ] > self::$line_prices[ $key ] ? (string) self::$line_prices[ $key ] : '';
+	}
+
+	/**
 	 * Return the computed base price for bundle products.
 	 *
 	 * @param string     $price   Stored price.
@@ -95,6 +146,51 @@ class OC_Bundles_Pricing {
 		$computed        = self::base_price( $product->get_id() );
 		self::$in_filter = false;
 		return (string) $computed;
+	}
+
+	/**
+	 * Regular price of a bundle: the price before the bundle discount.
+	 *
+	 * @param string     $price   Stored regular price.
+	 * @param WC_Product $product Product.
+	 * @return string
+	 */
+	public static function filter_regular_price( $price, $product ) {
+		if ( self::$in_filter || ! self::is_bundle( $product ) ) {
+			return $price;
+		}
+		self::$in_filter = true;
+		$computed        = self::raw_base_price( $product->get_id() );
+		self::$in_filter = false;
+		return (string) $computed;
+	}
+
+	/**
+	 * Sale price of a bundle: the discounted price when a discount applies, otherwise
+	 * none — so a stale _sale_price meta can never decide whether it is on sale.
+	 *
+	 * @param string     $price   Stored sale price.
+	 * @param WC_Product $product Product.
+	 * @return string
+	 */
+	public static function filter_sale_price( $price, $product ) {
+		if ( self::$in_filter || ! self::is_bundle( $product ) ) {
+			return $price;
+		}
+		self::$in_filter = true;
+		$config          = OC_Bundles_Helpers::get_config( $product->get_id() );
+		$raw             = self::raw_base_price( $product->get_id(), null, $config );
+		$base            = self::base_price( $product->get_id(), null, $config );
+		self::$in_filter = false;
+		return $base < $raw ? (string) $base : '';
+	}
+
+	/**
+	 * @param mixed $product Product.
+	 * @return bool
+	 */
+	protected static function is_bundle( $product ) {
+		return $product && is_a( $product, 'WC_Product' ) && $product->is_type( OC_BUNDLES_PRODUCT_TYPE );
 	}
 
 	/**

@@ -4,7 +4,7 @@ Requires at least: 6.2
 Tested up to: 6.8
 Requires PHP: 7.4
 WC requires at least: 7.0
-Stable tag: 1.4.4
+Stable tag: 1.4.5
 License: GPL-2.0+
 
 WooCommerce product bundles: a "Bundle" product type made of products and
@@ -63,6 +63,19 @@ For a private repo or to avoid GitHub rate limits, add a token:
        define( 'OC_BUNDLES_GITHUB_TOKEN', 'ghp_xxx' );
 
 == Changelog ==
+
+= 1.4.5 =
+* A discounted bundle now reports its prices the way WooCommerce expects: regular =
+  before the bundle discount, sale = after it. Everywhere a product on sale shows its
+  regular price struck through and the sale price in the theme's sale colour — the
+  product popup, shop cards, the block cart — a bundle now does too. Before, the
+  regular price was reported already discounted, so the bundle never counted as on
+  sale and its price showed in plain black. Cart lines add their swap surcharges to both.
+* Note: a discounted bundle is now "on sale" for WooCommerce, so a coupon set to
+  exclude sale items skips it, as it does any other product on sale.
+* Deliz popup: bundles get the theme's opening scroll nudge (a short scroll down and
+  back when the list continues below the fold). The theme skips bundles for its fade;
+  the plugin adds only the nudge, with the theme's timing.
 
 = 1.4.4 =
 * Deliz float cart: a bundle shown with its contents (as rows, or as a one-line list)

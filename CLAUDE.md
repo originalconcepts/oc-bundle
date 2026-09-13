@@ -122,6 +122,10 @@ product ID** on purpose: every WooCommerce stock path skips items whose
   mode), **before** discount.
 - `base_price` = raw after the bundle discount (percent or fixed amount).
 - `line_price` = base_price + surcharges of the currently-active swaps.
+- WooCommerce getters (filters in `Pricing::init`): `get_price()` = base,
+  `get_regular_price()` = raw, `get_sale_price()` = base when discounted else '' — so
+  `is_on_sale()` / `get_price_html()` render struck regular + sale natively. Cart line
+  objects get their captured unit price, with the discount added back for regular.
 - `sync_price_meta` writes `_price` = base; if discounted, `_regular_price` =
   raw and `_sale_price` = base (so shop/category shows struck regular + sale
   natively, no labels). Single product page renders its own dual price with
