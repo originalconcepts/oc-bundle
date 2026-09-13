@@ -241,3 +241,6 @@ msgstr "השאר ריק כדי להשתמש בכמות שהוזמנה. שמיר�
 
 msgid "Update the price when quantities are re-weighed on the order"
 msgstr "עדכן את המחיר כשהכמויות נשקלות מחדש בהזמנה"
+
+msgid "Unit"
+msgstr "יחידת מידה"

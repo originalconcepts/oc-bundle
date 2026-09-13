@@ -102,6 +102,19 @@ on the component lines, taxes moved proportionally. Component lines carry **no
 product ID** on purpose: every WooCommerce stock path skips items whose
 `get_product()` is falsy, so `Order` stays the only place component stock moves.
 
+**Re-weighing (1.4.7+)** — component lines split since 1.4.7 hold the component's quantity
+in the LINE quantity (name = product name, unit as item meta, flag
+`_oc_bundle_component_qty_line`) and point to their bundle line via
+`_oc_bundle_line_uid` / `_oc_bundle_component_parent`. The shop re-weighs by editing that
+quantity; `Order::reconcile()` reads those quantities as the weighed amounts, so the
+"Weighed quantities" table renders only for orders without such lines. When a re-weigh
+must not move money (fixed pricing, or `reweigh_price` off) the checkout amount/taxes
+(`_oc_bundle_component_amount` / `_oc_bundle_component_taxes`) are restored after
+WooCommerce's editor scales them. REST order updates reconcile too (only once stock was taken).
+The bundle line carries `_oc_bundle_qty_lines`; a component whose line was removed counts as
+weighed 0 (its stock goes back). A re-weigh is detected against the last saved `_oc_bundle_actual`,
+not the ledger, so it also works before stock was taken.
+
 **Config meta** — all under prefix `_oc_bundle_`. Keys (defaults in
 `Helpers::defaults()`): `components`, `pricing_mode` (fixed|sum), `fixed_price`,
 `discount_type` (none|percent|fixed), `discount_value`, `hide_price_labels`,

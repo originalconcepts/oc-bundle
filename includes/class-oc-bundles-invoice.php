@@ -6,8 +6,12 @@
  * With `invoice_display = components` the order shows:
  *
  *   Bundle name          x1     100.00   <- base price, without swap surcharges
- *     5 pcs Entrecote                    <- included in the bundle, no amount
- *     1 kg Lamb chops             5.00   <- this component's swap surcharge
+ *   Entrecote            x5              <- included in the bundle, no amount
+ *   Lamb chops           x1       5.00   <- this component's swap surcharge
+ *
+ * Each component line's quantity is what ships (per-bundle quantity times the number of
+ * bundles), with its unit as item meta — an ordinary WooCommerce line — so the shop
+ * re-weighs a component by editing that line's quantity (see OC_Bundles_Order).
  *
  * The order total never changes: whatever is taken off the bundle line is put
  * back on the component lines that caused it. Components included at no extra
@@ -31,6 +35,24 @@ class OC_Bundles_Invoice {
 
 	/** @var string Which component of the bundle this line represents. */
 	const INDEX = '_oc_bundle_component_index';
+
+	/** @var string On a component line: its quantity is the component's quantity (1.4.7+). */
+	const QTY_LINE = '_oc_bundle_component_qty_line';
+
+	/** @var string On a split bundle line: its component lines hold their own quantities (1.4.7+). */
+	const QTY_LINES = '_oc_bundle_qty_lines';
+
+	/** @var string On a split bundle line: tells it apart from other lines of the same bundle. */
+	const LINE_UID = '_oc_bundle_line_uid';
+
+	/** @var string On a component line: the LINE_UID of the bundle line it belongs to. */
+	const PARENT = '_oc_bundle_component_parent';
+
+	/** @var string On a component line: the amount checkout gave it. */
+	const AMOUNT = '_oc_bundle_component_amount';
+
+	/** @var string On a component line: the taxes checkout gave it. */
+	const TAXES = '_oc_bundle_component_taxes';
 
 
 	public static function init() {
@@ -184,9 +206,12 @@ class OC_Bundles_Invoice {
 		}
 
 		$tax_class = $item->get_tax_class();
+		$uid       = wp_generate_uuid4();
+		$item->update_meta_data( self::LINE_UID, $uid );
+		$qty_lines = false;
 
 		foreach ( $components as $index => $component ) {
-			$line = self::build_component_line( $component, $bundle_qty, $item->get_product_id(), $tax_class, $index );
+			$line = self::build_component_line( $component, $bundle_qty, $item->get_product_id(), $tax_class, $index, $uid );
 			if ( ! $line ) {
 				continue;
 			}
@@ -205,7 +230,17 @@ class OC_Bundles_Invoice {
 				$line->set_taxes( array( 'total' => $taxes, 'subtotal' => $taxes ) );
 			}
 
+			// Kept so a re-weigh that must not move money can put the line back.
+			$line->add_meta_data( self::AMOUNT, $amount, true );
+			$line->add_meta_data( self::TAXES, $line->get_taxes(), true );
+
+			$qty_lines = $qty_lines || (bool) $line->get_meta( self::QTY_LINE );
 			$order->add_item( $line );
+		}
+
+		// Tells OC_Bundles_Order these lines are the weighed amounts, even after one is removed.
+		if ( $qty_lines ) {
+			$item->update_meta_data( self::QTY_LINES, 1 );
 		}
 	}
 
@@ -216,9 +251,11 @@ class OC_Bundles_Invoice {
 	 * @param int    $bundle_qty Number of bundles ordered.
 	 * @param int    $bundle_id  Parent bundle product ID.
 	 * @param string $tax_class  Tax class inherited from the bundle line.
+	 * @param int    $index      Component index, so stock and re-pricing find this line again.
+	 * @param string $uid        LINE_UID of the bundle line.
 	 * @return WC_Order_Item_Product|null
 	 */
-	protected static function build_component_line( $component, $bundle_qty, $bundle_id, $tax_class, $index = null ) {
+	protected static function build_component_line( $component, $bundle_qty, $bundle_id, $tax_class, $index = null, $uid = '' ) {
 		$component = OC_Bundles_Helpers::normalize_component( $component );
 		$pid       = OC_Bundles_Helpers::effective_id( $component );
 		$product   = $pid ? wc_get_product( $pid ) : false;
@@ -226,18 +263,33 @@ class OC_Bundles_Invoice {
 			return null;
 		}
 
-		// Show what actually ships: per-bundle quantity times the number of bundles.
-		$scaled        = $component;
-		$scaled['qty'] = (float) $component['qty'] * $bundle_qty;
-		$label         = OC_Bundles_Helpers::quantity_label( $scaled );
+		// What actually ships: per-bundle quantity times the number of bundles.
+		$qty = (float) $component['qty'] * $bundle_qty;
 
 		$line = new WC_Order_Item_Product();
-		$line->set_name( trim( $label . ' ' . $product->get_name() ) );
-		$line->set_quantity( 1 );
 		$line->set_tax_class( $tax_class );
 		$line->add_meta_data( self::MARKER, (int) $bundle_id, true );
 		if ( null !== $index ) {
 			$line->add_meta_data( self::INDEX, (int) $index, true );
+		}
+		if ( '' !== $uid ) {
+			$line->add_meta_data( self::PARENT, $uid, true );
+		}
+
+		if ( self::quantity_fits( $qty ) ) {
+			// An ordinary line: the product's name, the quantity in the quantity column and the
+			// unit beside it, so re-weighing is editing the quantity like on any other line.
+			$line->set_name( $product->get_name() );
+			$line->set_quantity( $qty );
+			$line->add_meta_data( self::QTY_LINE, 1, true );
+			$line->add_meta_data( __( 'Unit', 'oc-bundles' ), OC_Bundles_Helpers::display_suffix( $component['unit'], $component['unit_label'] ), true );
+		} else {
+			// This store keeps whole-number line quantities (no weighable-products plugin), so a
+			// fraction cannot live in the quantity: name it instead, as before 1.4.7.
+			$scaled        = $component;
+			$scaled['qty'] = $qty;
+			$line->set_name( trim( OC_Bundles_Helpers::quantity_label( $scaled ) . ' ' . $product->get_name() ) );
+			$line->set_quantity( 1 );
 		}
 
 		if ( $product->get_sku() ) {
@@ -248,6 +300,17 @@ class OC_Bundles_Invoice {
 		}
 
 		return $line;
+	}
+
+	/**
+	 * Whether a line quantity can hold this amount as-is. WooCommerce's own wc_stock_amount()
+	 * rounds to whole numbers; a weighable-products plugin lets it keep fractions.
+	 *
+	 * @param float $qty Quantity.
+	 * @return bool
+	 */
+	protected static function quantity_fits( $qty ) {
+		return abs( (float) wc_stock_amount( $qty ) - (float) $qty ) < 0.00001;
 	}
 
 	/**

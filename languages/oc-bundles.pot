@@ -241,3 +241,6 @@ msgstr ""
 
 msgid "Update the price when quantities are re-weighed on the order"
 msgstr ""
+
+msgid "Unit"
+msgstr ""

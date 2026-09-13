@@ -64,6 +64,22 @@ For a private repo or to avoid GitHub rate limits, add a token:
 
 == Changelog ==
 
+= 1.4.7 =
+* Orders: a bundle split for the invoice now lists each component as an ordinary
+  WooCommerce line — the product's name, the quantity that ships in the quantity column,
+  and its unit — instead of spelling the quantity out in the name. The shop re-weighs a
+  component by editing that line's quantity, like any weighable product; saving settles
+  stock by the difference, and re-prices only when the bundle is set to. The separate
+  "Weighed quantities" table under the bundle line no longer appears for these orders
+  (it stays for orders without component lines).
+* Component lines are tied to their own bundle line, so two lines of the same bundle in
+  one order are never mixed up.
+* Order line changes through the WooCommerce REST API settle component stock too.
+* Removing a component line from the order (or saving it at quantity 0) returns that
+  component's stock, the same as removing any WooCommerce line.
+* Like any WooCommerce line, a component line is edited while the order is in an
+  editable status (pending payment / on hold).
+
 = 1.4.6 =
 * Deliz float cart: a bundle line now has the theme's "Edit" button under its contents
   list, looking and behaving like every other row's. It opens the product popup with the
