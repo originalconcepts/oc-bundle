@@ -4,7 +4,7 @@ Requires at least: 6.2
 Tested up to: 6.8
 Requires PHP: 7.4
 WC requires at least: 7.0
-Stable tag: 1.4.5
+Stable tag: 1.4.6
 License: GPL-2.0+
 
 WooCommerce product bundles: a "Bundle" product type made of products and
@@ -63,6 +63,14 @@ For a private repo or to avoid GitHub rate limits, add a token:
        define( 'OC_BUNDLES_GITHUB_TOKEN', 'ghp_xxx' );
 
 == Changelog ==
+
+= 1.4.6 =
+* Deliz float cart: a bundle line now has the theme's "Edit" button under its contents
+  list, looking and behaving like every other row's. It opens the product popup with the
+  bundle exactly as the customer put it together — quantity and chosen swaps, with the
+  matching price — and saving replaces the cart line with the changes.
+* The popup REST payload accepts oc_bundle_selection (index => swap index) to open with
+  given swaps; invalid choices are ignored.
 
 = 1.4.5 =
 * A discounted bundle now reports its prices the way WooCommerce expects: regular =

@@ -11,6 +11,10 @@
  * the theme gives any other product. The float cart is rebuilt from AJAX fragments
  * on every change, so the move runs again whenever new nodes arrive.
  *
+ * Under the contents it adds the theme's own edit button, so a bundle line opens in the
+ * product popup like any other row — with the swaps that line holds (see the click
+ * listener at the bottom and oc-bundles-deliz-popup.js).
+ *
  * @package OC_Bundles
  */
 (function () {
@@ -32,6 +36,33 @@
 		if (at !== -1 && text.slice(at + label.length + 1).trim() === '') {
 			prev.nodeValue = text.slice(0, at);
 		}
+	}
+
+	/**
+	 * The theme's edit button, carrying everything its click handler reads.
+	 */
+	function editButton(block, item) {
+		var key = item.getAttribute('data-cart-item-key');
+		var productId = block.getAttribute('data-oc-bundle-id');
+		if (!key || !productId) {
+			return null;
+		}
+		var i18n = window.ocBundlesDelizCart || {};
+		var button = document.createElement('button');
+		button.type = 'button';
+		button.className = 'ed-float-cart__edit-btn oc-bundle-edit-btn';
+		button.setAttribute('data-cart-item-key', key);
+		button.setAttribute('data-product-id', productId);
+		button.setAttribute('data-variation-id', '0');
+		button.setAttribute('data-quantity', block.getAttribute('data-oc-quantity') || '1');
+		button.setAttribute('data-variation', '');
+		button.setAttribute('data-product-note', '');
+		button.setAttribute('data-ocwsu-quantity-in-units', '0');
+		button.setAttribute('data-ocwsu-quantity-in-weight-units', '0');
+		button.setAttribute('data-oc-selection', block.getAttribute('data-oc-selection') || '{}');
+		button.setAttribute('aria-label', i18n.editAria || i18n.editLabel || 'Edit');
+		button.textContent = i18n.editLabel || 'Edit';
+		return button;
 	}
 
 	function relocate() {
@@ -56,6 +87,10 @@
 				line.appendChild(heading);
 			}
 			line.appendChild(block);
+			var edit = editButton(block, item);
+			if (edit) {
+				line.appendChild(edit);
+			}
 			inner.insertAdjacentElement('afterend', line);
 		}
 	}
@@ -74,6 +109,27 @@
 			relocate();
 		});
 	}
+
+	// Record which swaps a line holds just before the theme's own edit handler opens the
+	// popup, so the popup request can ask for them. pointerdown and keydown fire ahead of
+	// every click listener, whatever order the scripts registered theirs in.
+	function rememberEdit(e) {
+		if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') {
+			return;
+		}
+		var button = e.target && e.target.closest ? e.target.closest('.oc-bundle-edit-btn') : null;
+		if (!button) {
+			return;
+		}
+		window.ocBundlesPendingEdit = {
+			productId: button.getAttribute('data-product-id'),
+			selection: button.getAttribute('data-oc-selection') || '{}',
+			at: Date.now()
+		};
+	}
+	document.addEventListener('pointerdown', rememberEdit, true);
+	document.addEventListener('keydown', rememberEdit, true);
+	document.addEventListener('click', rememberEdit, true);
 
 	relocate();
 

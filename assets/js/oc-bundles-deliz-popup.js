@@ -24,6 +24,7 @@
 
 	var PRICE_SELECTOR = '.ed-product-popup__price-value';
 	var ADD_TO_CART_ROUTE = '/ed/v1/add-to-cart';
+	var POPUP_ROUTE = '/ed/v1/product-popup';
 
 	/* ---------------------------------------------------------------- markup */
 
@@ -343,6 +344,18 @@
 		window.fetch = function ( input, init ) {
 			try {
 				var url = ( typeof input === 'string' ) ? input : ( input && input.url );
+
+				// Reopening a bundle from the float cart's edit button: ask the popup payload for
+				// the swaps that line holds, so the popup shows the customer's own bundle.
+				var pending = window.ocBundlesPendingEdit;
+				if ( pending && typeof input === 'string' && input.indexOf( POPUP_ROUTE ) !== -1 && Date.now() - pending.at < 4000 ) {
+					var id = input.match( /[?&]id=(\d+)/ );
+					if ( id && id[ 1 ] === String( pending.productId ) ) {
+						window.ocBundlesPendingEdit = null;
+						var withSelection = input + ( input.indexOf( '?' ) === -1 ? '?' : '&' ) + 'oc_bundle_selection=' + encodeURIComponent( pending.selection );
+						return originalWindowFetch.call( this, withSelection, init );
+					}
+				}
 				if ( url && String( url ).indexOf( ADD_TO_CART_ROUTE ) !== -1 && init && typeof init.body === 'string' ) {
 					var selection = currentSelectionValue();
 					if ( selection ) {

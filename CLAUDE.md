@@ -77,7 +77,8 @@ assets/js/oc-bundles.js                Front: qty stepper, swap popup, live pric
 assets/js/oc-bundles-admin.js          Admin: component cards, sortable, qty cell.
 assets/css/oc-bundles-deliz-cart.css   Deliz float cart: full-width bundle contents line.
 assets/js/oc-bundles-deliz-cart.js     Deliz float cart: moves the plugin's contents block
-                                       out of the theme's narrow details column (plugin-only).
+                                       out of the theme's narrow details column (plugin-only),
+                                       adds the theme's edit button (reopens the line's swaps).
 languages/oc-bundles.pot               Source strings.
 languages/oc-bundles-he_IL.po/.mo      Hebrew translation (compiled).
 readme.txt                             Plugin readme.

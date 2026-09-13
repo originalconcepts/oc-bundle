@@ -38,8 +38,27 @@
 /* On wide screens the theme hangs the row's edit button 22px below the details
    column; keep the contents clear of it when the row has one. */
 @media (min-width: 1200px) {
-	.ed-float-cart__item:has(.ed-float-cart__edit-btn) > .oc-bundle-cart-contents {
+	.ed-float-cart__item:has(.ed-float-cart__details .ed-float-cart__edit-btn) > .oc-bundle-cart-contents {
 		margin-block-start: 28px;
+	}
+}
+
+/* The bundle's edit button uses the theme's own class, so it looks and behaves like every
+   other row's; it just sits under the contents list instead of under the name column. */
+.ed-float-cart__items .ed-float-cart__item .oc-bundle-cart-contents .ed-float-cart__edit-btn {
+	position: static;
+	display: block;
+	margin: 8px 0 0;
+}
+
+/* On wide screens the theme shows edit buttons only while the row is hovered. Same here,
+   but the space stays reserved so the row doesn't jump. */
+@media (min-width: 1200px) {
+	.ed-float-cart__items .ed-float-cart__item .oc-bundle-cart-contents .ed-float-cart__edit-btn {
+		visibility: hidden;
+	}
+	.ed-float-cart__items .ed-float-cart__item:hover .oc-bundle-cart-contents .ed-float-cart__edit-btn {
+		visibility: visible;
 	}
 }
 
