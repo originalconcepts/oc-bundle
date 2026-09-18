@@ -76,8 +76,15 @@ class OC_Bundles_Admin {
 	public static function render_panel() {
 		global $post;
 		$config = OC_Bundles_Helpers::get_config( $post->ID );
+		// Owned by an external system (Giorgio): render read-only. The fields are
+		// disabled by the admin script and save() refuses to overwrite the config.
+		$locked = OC_Bundles_Helpers::is_locked( $post->ID );
 		?>
-		<div id="oc_bundle_data" class="panel woocommerce_options_panel oc-bundle-panel">
+		<div id="oc_bundle_data" class="panel woocommerce_options_panel oc-bundle-panel<?php echo $locked ? ' is-locked' : ''; ?>" data-locked="<?php echo $locked ? '1' : '0'; ?>">
+
+			<?php if ( $locked ) : ?>
+				<div class="oc-bundle-locked-notice"><span class="dashicons dashicons-lock" aria-hidden="true"></span> <?php esc_html_e( 'Managed by Giorgio — edit it there.', 'oc-bundles' ); ?></div>
+			<?php endif; ?>
 
 			<div class="oc-bundle-section">
 				<h4><?php esc_html_e( 'Pricing', 'oc-bundles' ); ?></h4>
@@ -183,7 +190,11 @@ class OC_Bundles_Admin {
 	 * @param array      $component Component data.
 	 */
 	public static function render_component_row( $i, $component ) {
-		$component = OC_Bundles_Helpers::normalize_component( $component );
+		// Existing rows have a numeric index and a (stored or derived) key; the JS
+		// template row gets its key from the admin script when it is added.
+		$is_stored = is_numeric( $i );
+		$component = OC_Bundles_Helpers::normalize_component( $component, $is_stored ? (int) $i : null );
+		$key       = $is_stored ? $component['key'] : '';
 		$id        = OC_Bundles_Helpers::effective_id( $component );
 		$display   = $id ? wc_get_product( $id ) : false;
 		// For units_weight (variation weight) the searched product is the parent.
@@ -193,6 +204,7 @@ class OC_Bundles_Admin {
 		$swappable = 'yes' === $component['swappable'];
 		?>
 		<div class="oc-component-group" data-index="<?php echo esc_attr( $i ); ?>">
+			<input type="hidden" class="oc-component-key" name="oc_component_key[<?php echo esc_attr( $i ); ?>]" value="<?php echo esc_attr( $key ); ?>" />
 			<div class="oc-card-head">
 				<span class="oc-card-grip dashicons dashicons-menu" aria-hidden="true"></span>
 				<span class="oc-card-title"><?php echo ( $search_id && '' !== $name ) ? esc_html( $name ) : esc_html__( 'Bundle item', 'oc-bundles' ); ?></span>
@@ -382,6 +394,16 @@ class OC_Bundles_Admin {
 	 * @param int $post_id Product ID.
 	 */
 	public static function save( $post_id ) {
+		// An externally managed bundle keeps its configuration; WooCommerce's own
+		// product fields are still saved by WooCommerce as usual. Its price meta is
+		// still refreshed here: a `sum` bundle's `_price` follows its components, and an
+		// admin save is the moment WooCommerce would otherwise overwrite it with the
+		// (empty) regular price field.
+		if ( OC_Bundles_Helpers::is_locked( $post_id ) ) {
+			OC_Bundles_Pricing::sync_price_meta( $post_id );
+			return;
+		}
+
 		if ( ! isset( $_POST['_oc_bundle_pricing_mode'] ) && empty( $_POST['oc_component_product'] ) ) {
 			return;
 		}
@@ -454,7 +476,15 @@ class OC_Bundles_Admin {
 				$has_desc    = isset( $_POST['oc_component_has_desc'][ $i ] );
 				$description = ( $has_desc && isset( $_POST['oc_component_desc'][ $i ] ) ) ? sanitize_text_field( wp_unslash( $_POST['oc_component_desc'][ $i ] ) ) : '';
 
+				// Stable slot key: generated per card by the admin script; derived for
+				// rows saved before keys existed.
+				$key = isset( $_POST['oc_component_key'][ $i ] ) ? OC_Bundles_Helpers::sanitize_key_string( wp_unslash( $_POST['oc_component_key'][ $i ] ) ) : '';
+				if ( '' === $key ) {
+					$key = 'p' . $resolved['product_id'] . '-v' . $variation_id . '-' . count( $components );
+				}
+
 				$components[] = array(
+					'key'          => $key,
 					'product_id'   => $resolved['product_id'],
 					'variation_id' => $variation_id,
 					'qty'          => $qty,

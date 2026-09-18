@@ -4,7 +4,7 @@ Requires at least: 6.2
 Tested up to: 6.8
 Requires PHP: 7.4
 WC requires at least: 7.0
-Stable tag: 1.4.2
+Stable tag: 1.5.1
 License: GPL-2.0+
 
 WooCommerce product bundles: a "Bundle" product type made of products and
@@ -63,6 +63,54 @@ For a private repo or to avoid GitHub rate limits, add a token:
        define( 'OC_BUNDLES_GITHUB_TOKEN', 'ghp_xxx' );
 
 == Changelog ==
+
+= 1.5.1 =
+* Pricing: a component ordered by units but priced per kg (OC Sale Units "sold by
+  units" with a unit weight - e.g. a ~200 g portion of a 145/kg product) now costs
+  price x unit weight per unit in a "sum" bundle, exactly like the same product on a
+  regular cart line (was: price x units, i.e. 145 per portion). Applies to the bundle
+  price, to re-weighing and to the invoice split. For a "choose a weight" product the
+  REST API accepts `unit_weight` (kg) per component; without it the first weight
+  option is used.
+* Re-pricing of a "sum + re-weigh" bundle line no longer runs before anything was
+  weighed (checkout / status changes): the cart price stands until picking. It used
+  to replace "original price + swap surcharge" with the swapped product's own price
+  x the slot quantity, so an order could total more than the cart it came from.
+
+= 1.5.0 =
+* Giorgio sync: bundles can carry an external id (`external_id` in the REST API,
+  `?external_id=` filter on the list). A bundle that has one is managed from Giorgio:
+  the "Bundle contents" tab turns read-only with a notice, and saving the product no
+  longer overwrites its configuration (filter `oc_bundles_lock_managed`).
+* Every component now has a stable `key` (accepted and returned by the REST API,
+  generated per card in the admin, derived for older data). It follows the slot
+  through swaps and onto the order line.
+* REST API hardening: `invoice_display` is validated, and a component whose product
+  does not exist is rejected with a 400 (`oc_bundles_invalid_component`) before
+  anything is written.
+* Order lines can now carry a swap to a product that is not one of the configured
+  alternatives (`swap_index = -2`, product and surcharge on the selection entry).
+  Only external integrations produce it; the shop front end is unchanged.
+* Component lines created by the invoice split are linked to their bundle line by
+  item id, so two lines of the same bundle in one order no longer share their
+  component lines.
+* New public functions for integrations: oc_bundles_is_bundle_product(),
+  oc_bundles_is_bundle_order_item(), oc_bundles_is_component_line(),
+  oc_bundles_get_order_item_bundle_data(), oc_bundles_add_order_line(),
+  oc_bundles_update_order_line(), oc_bundles_release_order_line() (returns a
+  bundle line's component stock before the line is removed from an order).
+* Updating a bundle line swaps stock correctly: a component replaced on the line
+  gives its taken quantity back to the old product and the new product is reduced
+  in full. A line whose total is owned by Giorgio splits its components (sum
+  pricing) so they add up to exactly that total, and the component lines are named
+  after the weighed quantities. Re-splitting updates existing component lines in
+  place instead of removing and re-adding them. Saving a Giorgio-managed bundle in
+  the admin refreshes its price meta.
+* Store promotions can now reach bundles: the cart price is set early and captured
+  last, so a promotion engine's discount is what gets charged; the regular price of a
+  bundle is its pre-discount base, so it reads as "on sale" when discounted. New
+  setting under Settings → Bundles API (on by default) restores the old ordering
+  when turned off.
 
 = 1.4.2 =
 * Mini-cart: the bundle's quantity and price now stay on the first row beside the

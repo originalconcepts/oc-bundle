@@ -110,15 +110,34 @@
 		syncWeightHidden( $( this ) );
 	} );
 
+	/* Stable slot key for a new card (survives reordering and product changes). */
+	function newKey() {
+		return 'k' + Date.now().toString( 36 ) + Math.random().toString( 36 ).slice( 2, 8 );
+	}
+
 	/* Add component. */
 	$( document ).on( 'click', '.oc-add-component', function ( e ) {
 		e.preventDefault();
 		var index = 'c' + Date.now();
 		var html = $( '#tmpl-oc-component-row' ).html().replace( /\{\{INDEX\}\}/g, index );
-		$( '.oc-components-list' ).append( html );
+		var $row = $( html );
+		$row.find( '.oc-component-key' ).val( newKey() );
+		$( '.oc-components-list' ).append( $row );
 		reinit();
 		initSortable();
 	} );
+
+	/* Managed by an external system: the whole tab is read-only. */
+	function lockPanel() {
+		var $panel = $( '#oc_bundle_data.is-locked' );
+		if ( ! $panel.length ) {
+			return;
+		}
+		$panel.find( 'input, select, textarea, button' ).prop( 'disabled', true );
+	}
+	$( lockPanel );
+	// Enhanced selects are initialised on ready too; re-apply once they exist.
+	setTimeout( lockPanel, 500 );
 
 	/* Swappable toggle → show/hide the alternatives block. */
 	$( document ).on( 'change', '.oc-swappable-toggle', function () {
@@ -173,6 +192,7 @@
 		if ( ! $.fn.sortable ) { return; }
 		var $list = $( '.oc-components-list' );
 		if ( ! $list.length ) { return; }
+		if ( $list.closest( '.is-locked' ).length ) { return; }
 		if ( $list.data( 'ocSortable' ) ) {
 			$list.sortable( 'refresh' );
 			return;

@@ -46,13 +46,20 @@ class OC_Bundles_Source_OCWSU extends OC_Bundles_Source_Native {
 		return 'unit';
 	}
 
-	public function price_for_qty( $qty ) {
+	public function price_for_qty( $qty, $unit_weight_kg = 0 ) {
 		if ( ! $this->product || ! $this->is_weighable() ) {
 			return parent::price_for_qty( $qty );
 		}
-		// For weighable products the catalog price is per kg / per unit;
-		// contribution = displayed price (incl. tax settings) * qty.
+		// For weighable products the catalog price is per kg.
 		$unit_price = (float) wc_get_price_to_display( $this->product, array( 'qty' => 1 ) );
+
+		// Ordered by units but priced per kg: one unit costs price x its weight, exactly
+		// like the same product on a regular cart line (a 0.2 kg portion of a 145/kg
+		// product is 29, not 145).
+		if ( 'unit' === $this->unit() && (float) $unit_weight_kg > 0 ) {
+			return $unit_price * (float) $unit_weight_kg * (float) $qty;
+		}
+
 		return $unit_price * (float) $qty;
 	}
 

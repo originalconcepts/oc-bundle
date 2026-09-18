@@ -167,7 +167,7 @@ class OC_Bundles_Frontend {
 	public static function render_components( $config, $bundle_id, $selection = array(), $applied = array() ) {
 		echo '<div class="oc-components">';
 		foreach ( $config['components'] as $index => $component ) {
-			$component = OC_Bundles_Helpers::normalize_component( $component );
+			$component = OC_Bundles_Helpers::normalize_component( $component, $index );
 			$key       = isset( $selection[ $index ] ) ? intval( $selection[ $index ] ) : -1;
 			$active_id = OC_Bundles_Helpers::effective_active_id( $component, $key );
 			$product   = $active_id ? wc_get_product( $active_id ) : false;

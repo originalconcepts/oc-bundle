@@ -31,6 +31,32 @@ class OC_Bundles_API {
 		add_action( 'rest_api_init', array( __CLASS__, 'register_routes' ) );
 		add_action( 'admin_menu', array( __CLASS__, 'add_settings_page' ) );
 		add_action( 'admin_init', array( __CLASS__, 'maybe_regenerate_key' ) );
+		add_action( 'admin_init', array( __CLASS__, 'maybe_save_settings' ) );
+		// `?external_id=` on GET /bundles: wc_get_products() has no meta filter of its
+		// own, so the custom query var is turned into a meta query here.
+		add_filter( 'woocommerce_product_data_store_cpt_get_products_query', array( __CLASS__, 'filter_products_query' ), 10, 2 );
+	}
+
+	/**
+	 * Map the `oc_external_id` query var of wc_get_products() to a meta query.
+	 *
+	 * @param array $wp_query_args WP_Query args.
+	 * @param array $query_vars    Query vars.
+	 * @return array
+	 */
+	public static function filter_products_query( $wp_query_args, $query_vars ) {
+		if ( empty( $query_vars['oc_external_id'] ) ) {
+			return $wp_query_args;
+		}
+		if ( empty( $wp_query_args['meta_query'] ) || ! is_array( $wp_query_args['meta_query'] ) ) {
+			$wp_query_args['meta_query'] = array();
+		}
+		$wp_query_args['meta_query'][] = array(
+			'key'   => OC_Bundles_Helpers::EXTERNAL_ID_META,
+			'value' => (string) $query_vars['oc_external_id'],
+		);
+		unset( $wp_query_args['oc_external_id'] );
+		return $wp_query_args;
 	}
 
 	/**
@@ -65,6 +91,7 @@ class OC_Bundles_API {
 						'per_page' => array( 'default' => 20, 'sanitize_callback' => 'absint' ),
 						'search'   => array( 'sanitize_callback' => 'sanitize_text_field' ),
 						'status'   => array( 'default' => 'any', 'sanitize_callback' => 'sanitize_key' ),
+						'external_id' => array( 'sanitize_callback' => 'sanitize_text_field' ),
 					),
 				),
 				array(
@@ -160,6 +187,9 @@ class OC_Bundles_API {
 		if ( ! empty( $request['search'] ) ) {
 			$args['s'] = $request['search'];
 		}
+		if ( ! empty( $request['external_id'] ) ) {
+			$args['oc_external_id'] = (string) $request['external_id'];
+		}
 
 		$result  = wc_get_products( $args );
 		$bundles = array();
@@ -244,11 +274,12 @@ class OC_Bundles_API {
 		$available = OC_Bundles_Stock::available_quantity( $id, $resolved['components'] );
 
 		$components = array();
-		foreach ( $resolved['components'] as $c ) {
-			$c   = OC_Bundles_Helpers::normalize_component( $c );
+		foreach ( $resolved['components'] as $i => $c ) {
+			$c   = OC_Bundles_Helpers::normalize_component( $c, $i );
 			$pid = OC_Bundles_Helpers::effective_id( $c );
 			$src = OC_Bundles_Source_Factory::get( $pid );
 			$components[] = array(
+				'key'        => $c['key'],
 				'product_id' => $c['product_id'],
 				'variation_id' => $c['variation_id'],
 				'qty'        => (float) $c['qty'],
@@ -303,8 +334,8 @@ class OC_Bundles_API {
 		$available = OC_Bundles_Stock::available_quantity( $id, $resolved['components'] );
 
 		$components = array();
-		foreach ( $config['components'] as $c ) {
-			$c   = OC_Bundles_Helpers::normalize_component( $c );
+		foreach ( $config['components'] as $i => $c ) {
+			$c   = OC_Bundles_Helpers::normalize_component( $c, $i );
 			$pid = OC_Bundles_Helpers::effective_id( $c );
 			$p   = $pid ? wc_get_product( $pid ) : false;
 
@@ -322,6 +353,7 @@ class OC_Bundles_API {
 			}
 
 			$components[] = array(
+				'key'            => $c['key'],
 				'product_id'     => $c['product_id'],
 				'variation_id'   => $c['variation_id'],
 				'name'           => $p ? $p->get_name() : '',
@@ -340,6 +372,7 @@ class OC_Bundles_API {
 
 		return array(
 			'id'                      => $id,
+			'external_id'             => OC_Bundles_Helpers::external_id( $id ),
 			'name'                    => $product->get_name(),
 			'slug'                    => $product->get_slug(),
 			'sku'                     => $product->get_sku(),
@@ -376,6 +409,16 @@ class OC_Bundles_API {
 	 * @return int|WP_Error Product ID.
 	 */
 	protected static function save_bundle( $product, $data ) {
+		// Validate the components BEFORE the product is written, so a rejected request
+		// never leaves a half-created bundle behind.
+		$components = null;
+		if ( isset( $data['components'] ) && is_array( $data['components'] ) ) {
+			$components = self::sanitize_components( $data['components'] );
+			if ( is_wp_error( $components ) ) {
+				return $components;
+			}
+		}
+
 		if ( isset( $data['name'] ) ) {
 			$product->set_name( sanitize_text_field( $data['name'] ) );
 		}
@@ -431,8 +474,8 @@ class OC_Bundles_API {
 		if ( isset( $data['cart_display'] ) && in_array( $data['cart_display'], array( 'name_with_components', 'name_only', 'line' ), true ) ) {
 			$config['cart_display'] = $data['cart_display'];
 		}
-		if ( isset( $data['invoice_display'] ) ) {
-			$config['invoice_display'] = sanitize_key( $data['invoice_display'] );
+		if ( isset( $data['invoice_display'] ) && in_array( $data['invoice_display'], array( 'bundle', 'components' ), true ) ) {
+			$config['invoice_display'] = $data['invoice_display'];
 		}
 		if ( isset( $data['show_components_in_desc'] ) ) {
 			$config['show_components_in_desc'] = filter_var( $data['show_components_in_desc'], FILTER_VALIDATE_BOOLEAN ) ? 'yes' : 'no';
@@ -443,12 +486,23 @@ class OC_Bundles_API {
 		if ( isset( $data['reweigh_price'] ) ) {
 			$config['reweigh_price'] = filter_var( $data['reweigh_price'], FILTER_VALIDATE_BOOLEAN ) ? 'yes' : 'no';
 		}
-		if ( isset( $data['components'] ) && is_array( $data['components'] ) ) {
-			$config['components'] = self::sanitize_components( $data['components'] );
+		if ( null !== $components ) {
+			$config['components'] = $components;
 		}
 
 		foreach ( array_keys( OC_Bundles_Helpers::defaults() ) as $key ) {
 			update_post_meta( $id, '_oc_bundle_' . $key, $config[ $key ] );
+		}
+
+		// External (Giorgio) id: not a pricing key, kept outside the config. Empty clears it.
+		if ( isset( $data['external_id'] ) && is_scalar( $data['external_id'] ) ) {
+			$external_id = sanitize_text_field( (string) $data['external_id'] );
+			$external_id = function_exists( 'mb_substr' ) ? mb_substr( $external_id, 0, 100 ) : substr( $external_id, 0, 100 );
+			if ( '' === $external_id ) {
+				delete_post_meta( $id, OC_Bundles_Helpers::EXTERNAL_ID_META );
+			} else {
+				update_post_meta( $id, OC_Bundles_Helpers::EXTERNAL_ID_META, $external_id );
+			}
 		}
 
 		// Keep WooCommerce's price meta in sync for catalog/sorting (regular + sale).
@@ -459,10 +513,11 @@ class OC_Bundles_API {
 
 	/**
 	 * Sanitize an incoming components array. Unit/mode are auto-derived from the
-	 * product when not supplied, so Giorgio can send just product_id + qty.
+	 * product when not supplied, so Giorgio can send just product_id + qty. A key sent
+	 * by the caller is stored verbatim (trimmed to 40 chars); a missing one is derived.
 	 *
 	 * @param array $input Components.
-	 * @return array
+	 * @return array|WP_Error Error (400, oc_bundles_invalid_component) when a component's product does not exist.
 	 */
 	protected static function sanitize_components( $input ) {
 		$out = array();
@@ -476,7 +531,17 @@ class OC_Bundles_API {
 				continue;
 			}
 
-			$spec = OC_Bundles_Helpers::product_spec( $variation_id ? $variation_id : $product_id );
+			$effective = $variation_id ? $variation_id : $product_id;
+			if ( ! wc_get_product( $effective ) ) {
+				return new WP_Error(
+					'oc_bundles_invalid_component',
+					/* translators: %d is a product ID. */
+					sprintf( __( 'Component product %d does not exist.', 'oc-bundles' ), $effective ),
+					array( 'status' => 400 )
+				);
+			}
+
+			$spec = OC_Bundles_Helpers::product_spec( $effective );
 
 			$swaps = array();
 			if ( ! empty( $c['swaps'] ) && is_array( $c['swaps'] ) ) {
@@ -499,7 +564,13 @@ class OC_Bundles_API {
 
 			$swappable = ! empty( $c['swappable'] ) ? 'yes' : 'no';
 
+			$key = isset( $c['key'] ) ? OC_Bundles_Helpers::sanitize_key_string( $c['key'] ) : '';
+			if ( '' === $key ) {
+				$key = 'p' . $product_id . '-v' . $variation_id . '-' . count( $out );
+			}
+
 			$out[] = array(
+				'key'          => $key,
 				'product_id'   => $product_id,
 				'variation_id' => $variation_id,
 				'qty'          => isset( $c['qty'] ) ? (float) $c['qty'] : 1,
@@ -541,6 +612,21 @@ class OC_Bundles_API {
 		exit;
 	}
 
+	/**
+	 * Save the plugin-wide settings shown on the Bundles API page.
+	 */
+	public static function maybe_save_settings() {
+		if ( empty( $_POST['oc_bundles_save_settings'] ) ) {
+			return;
+		}
+		if ( ! current_user_can( 'manage_woocommerce' ) || ! check_admin_referer( 'oc_bundles_settings' ) ) {
+			return;
+		}
+		update_option( OC_Bundles_Helpers::PROMOTIONS_OPTION, empty( $_POST[ OC_Bundles_Helpers::PROMOTIONS_OPTION ] ) ? 'no' : 'yes', false );
+		wp_safe_redirect( add_query_arg( array( 'page' => 'oc-bundles-api', 'saved' => '1' ), admin_url( 'options-general.php' ) ) );
+		exit;
+	}
+
 	public static function render_settings_page() {
 		$key  = self::ensure_key();
 		$base = esc_url_raw( rest_url( self::NS ) );
@@ -549,6 +635,9 @@ class OC_Bundles_API {
 			<h1><?php esc_html_e( 'Bundles API', 'oc-bundles' ); ?></h1>
 			<?php if ( ! empty( $_GET['regenerated'] ) ) : ?>
 				<div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'A new API key was generated.', 'oc-bundles' ); ?></p></div>
+			<?php endif; ?>
+			<?php if ( ! empty( $_GET['saved'] ) ) : ?>
+				<div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'Settings saved.', 'oc-bundles' ); ?></p></div>
 			<?php endif; ?>
 			<p><?php esc_html_e( 'Use these details to connect an external system (e.g. Giorgio) to the bundles API.', 'oc-bundles' ); ?></p>
 			<table class="form-table" role="presentation">
@@ -568,6 +657,25 @@ class OC_Bundles_API {
 				<?php wp_nonce_field( 'oc_bundles_api_key' ); ?>
 				<input type="hidden" name="oc_bundles_regenerate" value="1" />
 				<?php submit_button( __( 'Regenerate key', 'oc-bundles' ), 'secondary', 'submit', true, array( 'onclick' => "return confirm('" . esc_js( __( 'Regenerating will break existing integrations until they are updated. Continue?', 'oc-bundles' ) ) . "');" ) ); ?>
+			</form>
+
+			<h2><?php esc_html_e( 'Promotions', 'oc-bundles' ); ?></h2>
+			<form method="post">
+				<?php wp_nonce_field( 'oc_bundles_settings' ); ?>
+				<input type="hidden" name="oc_bundles_save_settings" value="1" />
+				<table class="form-table" role="presentation">
+					<tr>
+						<th scope="row"><?php esc_html_e( 'Promotions', 'oc-bundles' ); ?></th>
+						<td>
+							<label>
+								<input type="checkbox" name="<?php echo esc_attr( OC_Bundles_Helpers::PROMOTIONS_OPTION ); ?>" value="yes" <?php checked( OC_Bundles_Helpers::promotions_allowed() ); ?> />
+								<?php esc_html_e( 'Allow store promotions to apply to bundles', 'oc-bundles' ); ?>
+							</label>
+							<p class="description"><?php esc_html_e( 'When on, the bundle price is set early in the cart calculation so promotion plugins can discount it. Turn off to restore the previous behaviour.', 'oc-bundles' ); ?></p>
+						</td>
+					</tr>
+				</table>
+				<?php submit_button(); ?>
 			</form>
 		</div>
 		<?php

@@ -35,10 +35,15 @@ interface OC_Bundles_Source_Interface {
 	/**
 	 * Price contribution for a given quantity in the bundle (used in 'sum' pricing).
 	 *
-	 * @param float $qty Quantity in the bundle.
+	 * A product priced per kg but ordered by units costs `price x unit weight` per unit,
+	 * exactly like the same product on a regular cart line; `$unit_weight_kg` carries that
+	 * weight (see OC_Bundles_Helpers::component_unit_weight_kg()). 0 = priced per unit / per kg as listed.
+	 *
+	 * @param float $qty            Quantity in the bundle.
+	 * @param float $unit_weight_kg Weight (kg) of one unit, for units priced per kg.
 	 * @return float
 	 */
-	public function price_for_qty( $qty );
+	public function price_for_qty( $qty, $unit_weight_kg = 0 );
 
 	/**
 	 * Human-readable quantity label, e.g. "0.5 kg" / "3 pcs".

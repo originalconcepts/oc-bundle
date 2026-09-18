@@ -30,6 +30,9 @@ class OC_Bundles_Order {
 	/** @var string Pre-ledger all-or-nothing flag, kept only to migrate old orders. */
 	const LEGACY_FLAG = '_oc_bundle_stock_reduced';
 
+	/** @var string 'yes' when an external system (Giorgio) owns the line price: never re-price on re-weigh. */
+	const EXTERNAL_PRICE = '_oc_bundle_external_price';
+
 	public static function init() {
 		add_action( 'woocommerce_reduce_order_stock', array( __CLASS__, 'reduce' ), 10, 1 );
 		add_action( 'woocommerce_restore_order_stock', array( __CLASS__, 'restore' ), 10, 1 );
@@ -67,10 +70,13 @@ class OC_Bundles_Order {
 	 * Walk the order's bundle lines and apply the difference between what stock has
 	 * already given this order and what it should be giving it now.
 	 *
-	 * @param WC_Order|int $order   Order.
+	 * @param WC_Order|int $order   Order. An object is used as-is (its in-memory items),
+	 *                              which is what the oc_bundles_*_order_line functions rely on.
 	 * @param bool         $release True to hand everything back to stock.
+	 * @param bool         $persist False to only update the in-memory items (ledger, totals)
+	 *                              and leave saving — and recalculating totals — to the caller.
 	 */
-	public static function reconcile( $order, $release = false ) {
+	public static function reconcile( $order, $release = false, $persist = true ) {
 		if ( is_numeric( $order ) ) {
 			$order = wc_get_order( $order );
 		}
@@ -94,7 +100,7 @@ class OC_Bundles_Order {
 			$changed    = false;
 
 			foreach ( $components as $index => $component ) {
-				$component = OC_Bundles_Helpers::normalize_component( $component );
+				$component = OC_Bundles_Helpers::normalize_component( $component, $index );
 				$pid       = OC_Bundles_Helpers::effective_id( $component );
 				if ( ! $pid ) {
 					continue;
@@ -121,16 +127,18 @@ class OC_Bundles_Order {
 
 			if ( $changed ) {
 				$item->update_meta_data( self::LEDGER, $ledger );
-				$item->save();
+				if ( $persist ) {
+					$item->save();
+				}
 				$dirty = true;
 			}
 
-			if ( ! $release && self::maybe_reprice( $order, $item, $components, $actual, $bundle_qty ) ) {
+			if ( ! $release && self::maybe_reprice( $order, $item, $components, $actual, $bundle_qty, $persist ) ) {
 				$repriced = true;
 			}
 		}
 
-		if ( $repriced ) {
+		if ( $repriced && $persist ) {
 			// Line totals moved, so let WooCommerce re-derive taxes and the order total
 			// from them -- the same thing the "Recalculate" button does.
 			$order->calculate_totals( true );
@@ -146,7 +154,9 @@ class OC_Bundles_Order {
 		if ( '' !== (string) $order->get_meta( self::LEGACY_FLAG ) ) {
 			$order->delete_meta_data( self::LEGACY_FLAG );
 		}
-		$order->save();
+		if ( $persist ) {
+			$order->save();
+		}
 	}
 
 	/**
@@ -164,13 +174,28 @@ class OC_Bundles_Order {
 	 * @param array                 $components Components.
 	 * @param array                 $actual     Weighed quantities by index.
 	 * @param int                   $bundle_qty Number of bundles.
+	 * @param bool                  $persist    False to change the in-memory lines only.
 	 * @return bool True when a total changed.
 	 */
-	protected static function maybe_reprice( $order, $item, $components, $actual, $bundle_qty ) {
+	protected static function maybe_reprice( $order, $item, $components, $actual, $bundle_qty, $persist = true ) {
 		$bundle_id = $item->get_product_id();
 		$config    = OC_Bundles_Helpers::get_config( $bundle_id );
 
 		if ( 'sum' !== $config['pricing_mode'] || 'yes' !== $config['reweigh_price'] ) {
+			return false;
+		}
+
+		// Nothing weighed yet (checkout / a status change before picking): the line keeps the
+		// price the cart charged. Re-pricing here would replace "original price + swap surcharge"
+		// with the swapped product's own price x the slot quantity, and the customer would see a
+		// different total on the order than on the cart.
+		if ( empty( $actual ) ) {
+			return false;
+		}
+
+		// An external system pushed this line's total (oc_bundles_*_order_line with
+		// `line_total`): it owns the price, so re-weighing here must not move it.
+		if ( 'yes' === $item->get_meta( self::EXTERNAL_PRICE ) ) {
 			return false;
 		}
 
@@ -187,7 +212,7 @@ class OC_Bundles_Order {
 		$amounts = array();
 		$labels  = array();
 		foreach ( $components as $index => $component ) {
-			$component = OC_Bundles_Helpers::normalize_component( $component );
+			$component = OC_Bundles_Helpers::normalize_component( $component, $index );
 			$pid       = OC_Bundles_Helpers::effective_id( $component );
 			$qty       = self::wanted( $component, $index, $actual, $bundle_qty );
 
@@ -203,7 +228,7 @@ class OC_Bundles_Order {
 
 			$amount = 0.0;
 			if ( $pid ) {
-				$amount = OC_Bundles_Source_Factory::get( $pid )->price_for_qty( $qty ) * $ratio;
+				$amount = OC_Bundles_Source_Factory::get( $pid )->price_for_qty( $qty, OC_Bundles_Helpers::component_unit_weight_kg( $component, $pid ) ) * $ratio;
 			}
 			// A swap surcharge is a flat delta per bundle, untouched by the discount.
 			if ( isset( $selection[ $index ]['surcharge'] ) ) {
@@ -216,7 +241,7 @@ class OC_Bundles_Order {
 
 		// When the order was split for the invoice, the money lives on the component
 		// lines; otherwise it all sits on the bundle line.
-		$split = self::component_lines( $order, $bundle_id );
+		$split = self::component_lines( $order, $item );
 
 		if ( ! empty( $split ) ) {
 			foreach ( $split as $index => $line ) {
@@ -228,11 +253,15 @@ class OC_Bundles_Order {
 				$line->set_name( $label );
 				$line->set_subtotal( $amount );
 				$line->set_total( $amount );
-				$line->save();
+				if ( $persist ) {
+					$line->save();
+				}
 			}
 			$item->set_subtotal( 0 );
 			$item->set_total( 0 );
-			$item->save();
+			if ( $persist ) {
+				$item->save();
+			}
 			return true;
 		}
 
@@ -241,24 +270,51 @@ class OC_Bundles_Order {
 		}
 		$item->set_subtotal( $total );
 		$item->set_total( $total );
-		$item->save();
+		if ( $persist ) {
+			$item->save();
+		}
 		return true;
 	}
 
 	/**
-	 * The invoice-split lines belonging to a bundle, keyed by component index.
+	 * The invoice-split lines belonging to a bundle line, keyed by component index.
 	 *
-	 * @param WC_Order $order     Order.
-	 * @param int      $bundle_id Bundle product ID.
+	 * A bundle line that still carries the split token (unsaved, split in memory) owns
+	 * exactly the lines whose parent token equals it. A saved bundle line owns the lines
+	 * that carry its item id. Lines with neither link (split before 1.5.0) are matched by
+	 * bundle product only for a parent without a token (ambiguous only when the same
+	 * bundle appears twice in one order).
+	 *
+	 * @param WC_Order              $order Order.
+	 * @param WC_Order_Item_Product $item  Bundle line item.
 	 * @return array
 	 */
-	protected static function component_lines( $order, $bundle_id ) {
-		if ( ! class_exists( 'OC_Bundles_Invoice' ) ) {
+	public static function component_lines( $order, $item ) {
+		if ( ! class_exists( 'OC_Bundles_Invoice' ) || ! $item instanceof WC_Order_Item_Product ) {
 			return array();
 		}
-		$lines = array();
+		$bundle_id = (int) $item->get_product_id();
+		$parent_id = (int) $item->get_id();
+		$token     = (string) $item->get_meta( OC_Bundles_Invoice::TOKEN );
+		$lines     = array();
 		foreach ( $order->get_items() as $line ) {
-			if ( (int) $line->get_meta( OC_Bundles_Invoice::MARKER ) !== (int) $bundle_id ) {
+			if ( (int) $line->get_meta( OC_Bundles_Invoice::MARKER ) !== $bundle_id ) {
+				continue;
+			}
+			$linked     = (string) $line->get_meta( OC_Bundles_Invoice::PARENT );
+			$line_token = (string) $line->get_meta( OC_Bundles_Invoice::PARENT_TOKEN );
+			if ( '' !== $linked ) {
+				// Saved line: it must carry THIS parent's item id.
+				if ( ! $parent_id || (int) $linked !== $parent_id ) {
+					continue;
+				}
+			} elseif ( '' !== $line_token ) {
+				// Unsaved line: it must carry THIS parent's token.
+				if ( '' === $token || $line_token !== $token ) {
+					continue;
+				}
+			} elseif ( '' !== $token ) {
+				// A legacy (unlinked) line can never belong to a parent that is still unsaved.
 				continue;
 			}
 			$index = $line->get_meta( OC_Bundles_Invoice::INDEX );
@@ -268,6 +324,45 @@ class OC_Bundles_Order {
 			$lines[ (int) $index ] = $line;
 		}
 		return $lines;
+	}
+
+	/**
+	 * Hand back to component stock everything ONE bundle line has taken, in memory.
+	 *
+	 * For a line that is about to leave the order (the connector's rebuild). Only this
+	 * line is touched — reconcile() walks every bundle line of the order. The ledger is
+	 * left as an EMPTY array rather than deleted: should the line survive after all, the
+	 * next reconcile() re-takes its stock in full instead of seeding the ledger from the
+	 * legacy order flag. Nothing is saved; the caller saves (or removes the line).
+	 *
+	 * @param WC_Order_Item_Product $item Bundle line.
+	 */
+	public static function release_item( $item ) {
+		if ( ! $item instanceof WC_Order_Item_Product ) {
+			return;
+		}
+		$components = $item->get_meta( '_oc_bundle_components' );
+		if ( empty( $components ) || ! is_array( $components ) ) {
+			return;
+		}
+
+		$bundle_qty = max( 1, (int) $item->get_quantity() );
+		$ledger     = self::ledger( $item, $components, $bundle_qty );
+
+		foreach ( $ledger as $index => $taken ) {
+			$taken = (float) $taken;
+			if ( $taken <= 0 || ! isset( $components[ $index ] ) ) {
+				continue;
+			}
+			$component = OC_Bundles_Helpers::normalize_component( $components[ $index ], $index );
+			$pid       = OC_Bundles_Helpers::effective_id( $component );
+			if ( ! $pid ) {
+				continue;
+			}
+			OC_Bundles_Source_Factory::get( $pid )->increment( $taken, $component['unit'] );
+		}
+
+		$item->update_meta_data( self::LEDGER, array() );
 	}
 
 	/**
@@ -304,7 +399,9 @@ class OC_Bundles_Order {
 			return $ledger;
 		}
 
-		$order  = $item->get_order();
+		// Only a line that was persisted before per-component accounting existed can
+		// have taken stock under the legacy flag; a line with no id yet never did.
+		$order  = ( (int) $item->get_id() > 0 ) ? $item->get_order() : null;
 		$legacy = ( $order instanceof WC_Order ) && 'yes' === $order->get_meta( self::LEGACY_FLAG );
 
 		$ledger = array();
@@ -342,7 +439,7 @@ class OC_Bundles_Order {
 		echo '<div class="oc-order-actuals"><strong>' . esc_html__( 'Weighed quantities', 'oc-bundles' ) . '</strong><table class="oc-order-actuals-table">';
 
 		foreach ( $components as $index => $component ) {
-			$component = OC_Bundles_Helpers::normalize_component( $component );
+			$component = OC_Bundles_Helpers::normalize_component( $component, $index );
 			$pid       = OC_Bundles_Helpers::effective_id( $component );
 			$product   = $pid ? wc_get_product( $pid ) : false;
 			if ( ! $product ) {

@@ -54,13 +54,25 @@ class OC_Bundles_Helpers {
 		return $config;
 	}
 
+	/** @var string Post meta holding the external (Giorgio) id of a bundle product. */
+	const EXTERNAL_ID_META = '_oc_bundle_external_id';
+
+	/** @var string Option: let store promotions reach bundle cart lines (yes|no). */
+	const PROMOTIONS_OPTION = 'oc_bundles_allow_promotions';
+
 	/**
 	 * Normalize a stored component into a clean array (new per-product swap model).
 	 *
-	 * @param array $component Raw component.
+	 * @param array    $component Raw component.
+	 * @param int|null $index     Position of the component in its list, when known.
+	 *                            Only used to derive a key for components that have none.
 	 * @return array
 	 */
-	public static function normalize_component( $component ) {
+	public static function normalize_component( $component, $index = null ) {
+		if ( ! is_array( $component ) ) {
+			$component = array();
+		}
+
 		$swaps = array();
 		if ( ! empty( $component['swaps'] ) && is_array( $component['swaps'] ) ) {
 			foreach ( $component['swaps'] as $swap ) {
@@ -72,9 +84,13 @@ class OC_Bundles_Helpers {
 			}
 		}
 
+		$product_id   = isset( $component['product_id'] ) ? absint( $component['product_id'] ) : 0;
+		$variation_id = isset( $component['variation_id'] ) ? absint( $component['variation_id'] ) : 0;
+
 		return array(
-			'product_id'   => isset( $component['product_id'] ) ? absint( $component['product_id'] ) : 0,
-			'variation_id' => isset( $component['variation_id'] ) ? absint( $component['variation_id'] ) : 0,
+			'key'          => self::component_key( $component, $product_id, $variation_id, $index ),
+			'product_id'   => $product_id,
+			'variation_id' => $variation_id,
 			'qty'          => isset( $component['qty'] ) ? (float) $component['qty'] : 0,
 			'unit'         => isset( $component['unit'] ) ? sanitize_text_field( $component['unit'] ) : 'unit',
 			'unit_label'   => isset( $component['unit_label'] ) ? sanitize_text_field( $component['unit_label'] ) : '',
@@ -84,6 +100,100 @@ class OC_Bundles_Helpers {
 			'swappable'    => ( isset( $component['swappable'] ) && 'yes' === $component['swappable'] ) ? 'yes' : 'no',
 			'swaps'        => $swaps,
 		);
+	}
+
+	/**
+	 * Stable component key: the stored one verbatim (trimmed to 40 chars), else
+	 * `p{product_id}-v{variation_id}-{index}` (no index suffix when unknown).
+	 *
+	 * @param array    $component    Raw component.
+	 * @param int      $product_id   Product ID.
+	 * @param int      $variation_id Variation ID.
+	 * @param int|null $index        Position in the list, when known.
+	 * @return string
+	 */
+	public static function component_key( $component, $product_id, $variation_id, $index = null ) {
+		$key = ( is_array( $component ) && isset( $component['key'] ) ) ? self::sanitize_key_string( $component['key'] ) : '';
+		if ( '' !== $key ) {
+			return $key;
+		}
+		$key = 'p' . absint( $product_id ) . '-v' . absint( $variation_id );
+		if ( null !== $index && '' !== (string) $index ) {
+			$key .= '-' . sanitize_text_field( (string) $index );
+		}
+		return $key;
+	}
+
+	/**
+	 * Sanitize a component key (string, at most 40 characters).
+	 *
+	 * @param mixed $key Raw key.
+	 * @return string
+	 */
+	public static function sanitize_key_string( $key ) {
+		if ( is_array( $key ) || is_object( $key ) ) {
+			return '';
+		}
+		$key = sanitize_text_field( (string) $key );
+		if ( function_exists( 'mb_substr' ) ) {
+			return mb_substr( $key, 0, 40 );
+		}
+		return substr( $key, 0, 40 );
+	}
+
+	/**
+	 * External (Giorgio) id of a bundle product, '' when unmanaged.
+	 *
+	 * @param int $product_id Bundle product ID.
+	 * @return string
+	 */
+	public static function external_id( $product_id ) {
+		$value = get_post_meta( absint( $product_id ), self::EXTERNAL_ID_META, true );
+		return is_string( $value ) ? $value : '';
+	}
+
+	/**
+	 * Whether the admin "Bundle contents" tab is read-only for this product because an
+	 * external system owns it. Filter `oc_bundles_lock_managed` (default true) can undo it.
+	 *
+	 * @param int $product_id Bundle product ID.
+	 * @return bool
+	 */
+	public static function is_locked( $product_id ) {
+		if ( '' === self::external_id( $product_id ) ) {
+			return false;
+		}
+		return (bool) apply_filters( 'oc_bundles_lock_managed', true, absint( $product_id ) );
+	}
+
+	/**
+	 * Whether store promotions are allowed to re-price bundle cart lines (option, default on).
+	 *
+	 * @return bool
+	 */
+	public static function promotions_allowed() {
+		return 'no' !== get_option( self::PROMOTIONS_OPTION, 'yes' );
+	}
+
+	/**
+	 * Index of the configured swap matching a product, or -1 when none does.
+	 *
+	 * @param array $component    Normalized component.
+	 * @param int   $product_id   Product ID.
+	 * @param int   $variation_id Variation ID (0 for none).
+	 * @return int
+	 */
+	public static function find_swap_index( $component, $product_id, $variation_id = 0 ) {
+		$component  = self::normalize_component( $component );
+		$product_id = absint( $product_id );
+		$want       = $variation_id ? absint( $variation_id ) : $product_id;
+		foreach ( $component['swaps'] as $k => $swap ) {
+			$have = $swap['variation_id'] ? $swap['variation_id'] : $swap['product_id'];
+			if ( $have && $have === $want ) {
+				return (int) $k;
+			}
+		}
+		return -1;
 	}
 
 	/**
@@ -132,7 +242,7 @@ class OC_Bundles_Helpers {
 		}
 
 		foreach ( $config['components'] as $index => $component ) {
-			$component = self::normalize_component( $component );
+			$component = self::normalize_component( $component, $index );
 			if ( 'yes' !== $component['swappable'] || empty( $component['swaps'] ) ) {
 				continue;
 			}
@@ -275,6 +385,58 @@ class OC_Bundles_Helpers {
 		}
 
 		return $spec;
+	}
+
+	/**
+	 * Weight (kg) of ONE unit of a component that is ordered by units but priced per kg
+	 * (OCWSU "sold by units"). 0 for everything else (sold by weight, plain products).
+	 *
+	 * - fixed unit weight (`units`): the product's own unit weight;
+	 * - chosen weight (`units_weight`): the weight stored on the component (admin select /
+	 *   REST `unit_weight`, kg), else the chosen variation's weight, else the first option.
+	 *
+	 * @param array $component  Component (raw or normalized).
+	 * @param int   $product_id Product actually priced (defaults to the component's own).
+	 * @return float
+	 */
+	public static function component_unit_weight_kg( $component, $product_id = 0 ) {
+		$product_id = $product_id ? absint( $product_id ) : self::effective_id( $component );
+		if ( ! $product_id ) {
+			return 0.0;
+		}
+		$spec = self::product_spec( $product_id );
+
+		if ( 'units' === $spec['mode'] ) {
+			return max( 0.0, (float) $spec['unit_weight'] );
+		}
+		if ( 'units_weight' !== $spec['mode'] ) {
+			return 0.0;
+		}
+
+		// The stored weight belongs to the component's own product, not to a swap.
+		$own    = ( self::effective_id( $component ) === $product_id );
+		$weight = ( $own && isset( $component['unit_weight'] ) ) ? (float) $component['unit_weight'] : 0.0;
+		$from_list = false;
+		if ( $weight <= 0 ) {
+			foreach ( $spec['weight_options'] as $opt ) {
+				if ( $opt['variation_id'] && (int) $opt['variation_id'] === (int) $product_id ) {
+					$weight = (float) $opt['weight'];
+					break;
+				}
+			}
+		}
+		if ( $weight <= 0 && ! empty( $spec['weight_options'] ) ) {
+			$weight    = (float) $spec['weight_options'][0]['weight'];
+			$from_list = empty( $spec['weight_options'][0]['variation_id'] );
+		}
+
+		// A fixed list is written in the product's weight unit; variation weights and the
+		// REST value are kg. A "unit" of 20 kg or more can only be a grams figure.
+		if ( 'grams' === $spec['weight_unit'] && ( $from_list || $weight >= 20 ) ) {
+			$weight = $weight / 1000;
+		}
+
+		return max( 0.0, $weight );
 	}
 
 	/**

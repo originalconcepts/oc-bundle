@@ -241,3 +241,33 @@ msgstr "השאר ריק כדי להשתמש בכמות שהוזמנה. שמיר�
 
 msgid "Update the price when quantities are re-weighed on the order"
 msgstr "עדכן את המחיר כשהכמויות נשקלות מחדש בהזמנה"
+
+msgid "Managed by Giorgio — edit it there."
+msgstr "מנוהל מ-Giorgio — יש לערוך שם."
+
+msgid "Component product %d does not exist."
+msgstr "מוצר הרכיב %d אינו קיים."
+
+msgid "The product is not a bundle."
+msgstr "המוצר אינו מארז."
+
+msgid "The order line is not a bundle."
+msgstr "שורת ההזמנה אינה מארז."
+
+msgid "Order not found."
+msgstr "ההזמנה לא נמצאה."
+
+msgid "The bundle has no components."
+msgstr "למארז אין רכיבים."
+
+msgid "Settings saved."
+msgstr "ההגדרות נשמרו."
+
+msgid "Promotions"
+msgstr "מבצעים"
+
+msgid "Allow store promotions to apply to bundles"
+msgstr "אפשר למבצעי החנות לחול על מארזים"
+
+msgid "When on, the bundle price is set early in the cart calculation so promotion plugins can discount it. Turn off to restore the previous behaviour."
+msgstr "כשמופעל, מחיר המארז נקבע בשלב מוקדם של חישוב הסל כך שתוספי מבצעים יכולים להנחות אותו. כבו כדי לחזור להתנהגות הקודמת."

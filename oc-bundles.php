@@ -3,7 +3,7 @@
  * Plugin Name:       Original Concepts Bundles
  * Plugin URI:        https://originalconcepts.co.il/
  * Description:       WooCommerce product bundles: a "Bundle" product type made of products and quantities, with flexible pricing, per-product swapping, and component-level stock. Works with or without the OC Sale Units plugin, in any theme.
- * Version:           1.4.2
+ * Version:           1.5.1
  * Author:            Original Concepts
  * Author URI:        https://originalconcepts.co.il/
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'OC_BUNDLES_VERSION', '1.4.2' );
+define( 'OC_BUNDLES_VERSION', '1.5.1' );
 define( 'OC_BUNDLES_FILE', __FILE__ );
 define( 'OC_BUNDLES_PATH', plugin_dir_path( __FILE__ ) );
 define( 'OC_BUNDLES_URL', plugin_dir_url( __FILE__ ) );
@@ -84,6 +84,7 @@ add_action(
 		require_once OC_BUNDLES_PATH . 'includes/class-oc-bundles-swap.php';
 		require_once OC_BUNDLES_PATH . 'includes/class-oc-bundles-updater.php';
 		require_once OC_BUNDLES_PATH . 'includes/class-oc-bundles-api.php';
+		require_once OC_BUNDLES_PATH . 'includes/oc-bundles-functions.php';
 
 		OC_Bundles_Product_Type::init();
 		OC_Bundles_Pricing::init();

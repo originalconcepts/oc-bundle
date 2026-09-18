@@ -17,18 +17,30 @@ class OC_Bundles_Pricing {
 
 	public static function init() {
 		add_filter( 'woocommerce_product_get_price', array( __CLASS__, 'filter_price' ), 10, 2 );
-		add_filter( 'woocommerce_product_get_regular_price', array( __CLASS__, 'filter_price' ), 10, 2 );
+		// The regular price is the PRE-discount base, so is_on_sale() holds whenever a
+		// bundle discount exists (the single page keeps rendering its own dual block).
+		add_filter( 'woocommerce_product_get_regular_price', array( __CLASS__, 'filter_regular_price' ), 10, 2 );
 
 		// Keep a cart line at the price the cart computed for it, surcharges included.
-		add_action( 'woocommerce_before_calculate_totals', array( __CLASS__, 'capture_line_prices' ), 21 );
+		if ( OC_Bundles_Helpers::promotions_allowed() ) {
+			// Cart sets the price at 5. Capture it right away (so a promotion engine
+			// reading get_price() at 20 sees base + surcharges), then capture again LAST
+			// so whatever a promotion engine set_price()'d is what wins.
+			add_action( 'woocommerce_before_calculate_totals', array( __CLASS__, 'capture_line_prices' ), 6 );
+			add_action( 'woocommerce_before_calculate_totals', array( __CLASS__, 'capture_line_prices' ), PHP_INT_MAX );
+		} else {
+			add_action( 'woocommerce_before_calculate_totals', array( __CLASS__, 'capture_line_prices' ), 21 );
+		}
 		add_filter( 'woocommerce_product_get_price', array( __CLASS__, 'restore_line_price' ), 20, 2 );
 	}
 
 	/**
 	 * Record what each bundle cart line should actually cost.
 	 *
-	 * OC_Bundles_Cart::before_totals() runs at priority 20 and calls set_price() with
-	 * base + swap surcharges. We read the same value one step later, keyed by the line's
+	 * OC_Bundles_Cart::before_totals() calls set_price() with base + swap surcharges.
+	 * With promotions allowed we read the price currently ON the product object (raw
+	 * prop, no filters) so a later set_price() by a promotion engine is honoured;
+	 * otherwise the cart's own unit price is used, as before. Keyed by the line's
 	 * product object.
 	 *
 	 * @param WC_Cart $cart Cart.
@@ -40,6 +52,8 @@ class OC_Bundles_Pricing {
 			return;
 		}
 
+		$from_object = OC_Bundles_Helpers::promotions_allowed();
+
 		foreach ( $cart->get_cart() as $cart_item ) {
 			if ( empty( $cart_item['oc_bundle']['unit_price'] ) || empty( $cart_item['data'] ) ) {
 				continue;
@@ -47,7 +61,14 @@ class OC_Bundles_Pricing {
 			if ( ! is_object( $cart_item['data'] ) ) {
 				continue;
 			}
-			self::$line_prices[ spl_object_id( $cart_item['data'] ) ] = (float) $cart_item['oc_bundle']['unit_price'];
+			$price = (float) $cart_item['oc_bundle']['unit_price'];
+			if ( $from_object && is_a( $cart_item['data'], 'WC_Product' ) ) {
+				$current = $cart_item['data']->get_price( 'edit' );
+				if ( '' !== (string) $current && null !== $current ) {
+					$price = (float) $current;
+				}
+			}
+			self::$line_prices[ spl_object_id( $cart_item['data'] ) ] = $price;
 		}
 	}
 
@@ -98,6 +119,26 @@ class OC_Bundles_Pricing {
 	}
 
 	/**
+	 * Return the pre-discount base price as the regular price of bundle products.
+	 *
+	 * @param string     $price   Stored regular price.
+	 * @param WC_Product $product Product.
+	 * @return string
+	 */
+	public static function filter_regular_price( $price, $product ) {
+		if ( self::$in_filter ) {
+			return $price;
+		}
+		if ( ! $product || ! is_a( $product, 'WC_Product' ) || ! $product->is_type( OC_BUNDLES_PRODUCT_TYPE ) ) {
+			return $price;
+		}
+		self::$in_filter = true;
+		$computed        = self::raw_base_price( $product->get_id() );
+		self::$in_filter = false;
+		return (string) $computed;
+	}
+
+	/**
 	 * Base bundle price (before swap surcharges), after discount.
 	 *
 	 * @param int   $bundle_id  Bundle product ID.
@@ -122,7 +163,7 @@ class OC_Bundles_Pricing {
 					continue;
 				}
 				$source = OC_Bundles_Source_Factory::get( $pid );
-				$price += $source->price_for_qty( $component['qty'] );
+				$price += $source->price_for_qty( $component['qty'], OC_Bundles_Helpers::component_unit_weight_kg( $component, $pid ) );
 			}
 		} else {
 			$price = (float) $config['fixed_price'];

@@ -46,7 +46,7 @@ class OC_Bundles_Source_Native implements OC_Bundles_Source_Interface {
 		return $this->product ? $this->product->is_in_stock() : false;
 	}
 
-	public function price_for_qty( $qty ) {
+	public function price_for_qty( $qty, $unit_weight_kg = 0 ) {
 		if ( ! $this->product ) {
 			return 0.0;
 		}

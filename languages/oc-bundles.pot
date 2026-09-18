@@ -241,3 +241,33 @@ msgstr ""
 
 msgid "Update the price when quantities are re-weighed on the order"
 msgstr ""
+
+msgid "Managed by Giorgio — edit it there."
+msgstr ""
+
+msgid "Component product %d does not exist."
+msgstr ""
+
+msgid "The product is not a bundle."
+msgstr ""
+
+msgid "The order line is not a bundle."
+msgstr ""
+
+msgid "Order not found."
+msgstr ""
+
+msgid "The bundle has no components."
+msgstr ""
+
+msgid "Settings saved."
+msgstr ""
+
+msgid "Promotions"
+msgstr ""
+
+msgid "Allow store promotions to apply to bundles"
+msgstr ""
+
+msgid "When on, the bundle price is set early in the cart calculation so promotion plugins can discount it. Turn off to restore the previous behaviour."
+msgstr ""

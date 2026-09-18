@@ -13,7 +13,9 @@ class OC_Bundles_Cart {
 	public static function init() {
 		add_filter( 'woocommerce_add_cart_item_data', array( __CLASS__, 'add_cart_item_data' ), 10, 3 );
 		add_filter( 'woocommerce_get_cart_item_from_session', array( __CLASS__, 'get_from_session' ), 10, 2 );
-		add_action( 'woocommerce_before_calculate_totals', array( __CLASS__, 'before_totals' ), 20 );
+		// With promotions allowed the bundle price is set EARLY (5) so a promotion engine
+		// running at the usual 20 can discount it; otherwise the historical 20 is kept.
+		add_action( 'woocommerce_before_calculate_totals', array( __CLASS__, 'before_totals' ), OC_Bundles_Helpers::promotions_allowed() ? 5 : 20 );
 		add_filter( 'woocommerce_get_item_data', array( __CLASS__, 'item_data' ), 10, 2 );
 		add_action( 'woocommerce_checkout_create_order_line_item', array( __CLASS__, 'create_order_line_item' ), 10, 4 );
 		add_filter( 'woocommerce_add_to_cart_validation', array( __CLASS__, 'validate' ), 10, 3 );
@@ -70,13 +72,15 @@ class OC_Bundles_Cart {
 		$applied = array();
 
 		foreach ( $config['components'] as $index => $component ) {
-			$component = OC_Bundles_Helpers::normalize_component( $component );
+			$component = OC_Bundles_Helpers::normalize_component( $component, $index );
 
 			$choice = isset( $selection[ $index ] ) ? intval( $selection[ $index ] ) : -1;
 
 			if ( 'yes' === $component['swappable'] && $choice >= 0 && isset( $component['swaps'][ $choice ] ) ) {
 				$swap  = $component['swaps'][ $choice ];
 				$out[] = array(
+					// The slot keeps its identity across a swap.
+					'key'          => $component['key'],
 					'product_id'   => absint( $swap['product_id'] ),
 					'variation_id' => absint( $swap['variation_id'] ),
 					'qty'          => $component['qty'],
