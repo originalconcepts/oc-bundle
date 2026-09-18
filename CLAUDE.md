@@ -75,6 +75,10 @@ assets/css/oc-bundles.css              Front styles (deliz green #13433A, RTL-sa
 assets/css/oc-bundles-admin.css        Admin card + toggle styles.
 assets/js/oc-bundles.js                Front: qty stepper, swap popup, live price.
 assets/js/oc-bundles-admin.js          Admin: component cards, sortable, qty cell.
+assets/css/oc-bundles-deliz-cart.css   Deliz float cart: full-width bundle contents line.
+assets/js/oc-bundles-deliz-cart.js     Deliz float cart: moves the plugin's contents block
+                                       out of the theme's narrow details column (plugin-only),
+                                       adds the theme's edit button (reopens the line's swaps).
 languages/oc-bundles.pot               Source strings.
 languages/oc-bundles-he_IL.po/.mo      Hebrew translation (compiled).
 readme.txt                             Plugin readme.
@@ -98,6 +102,19 @@ on the component lines, taxes moved proportionally. Component lines carry **no
 product ID** on purpose: every WooCommerce stock path skips items whose
 `get_product()` is falsy, so `Order` stays the only place component stock moves.
 
+**Re-weighing (1.4.7+)** — component lines split since 1.4.7 hold the component's quantity
+in the LINE quantity (name = product name, unit as item meta, flag
+`_oc_bundle_component_qty_line`) and point to their bundle line via
+`_oc_bundle_line_uid` / `_oc_bundle_component_parent`. The shop re-weighs by editing that
+quantity; `Order::reconcile()` reads those quantities as the weighed amounts, so the
+"Weighed quantities" table renders only for orders without such lines. When a re-weigh
+must not move money (fixed pricing, or `reweigh_price` off) the checkout amount/taxes
+(`_oc_bundle_component_amount` / `_oc_bundle_component_taxes`) are restored after
+WooCommerce's editor scales them. REST order updates reconcile too (only once stock was taken).
+The bundle line carries `_oc_bundle_qty_lines`; a component whose line was removed counts as
+weighed 0 (its stock goes back). A re-weigh is detected against the last saved `_oc_bundle_actual`,
+not the ledger, so it also works before stock was taken.
+
 **Config meta** — all under prefix `_oc_bundle_`. Keys (defaults in
 `Helpers::defaults()`): `components`, `pricing_mode` (fixed|sum), `fixed_price`,
 `discount_type` (none|percent|fixed), `discount_value`, `hide_price_labels`,
@@ -119,6 +136,10 @@ product ID** on purpose: every WooCommerce stock path skips items whose
   mode), **before** discount.
 - `base_price` = raw after the bundle discount (percent or fixed amount).
 - `line_price` = base_price + surcharges of the currently-active swaps.
+- WooCommerce getters (filters in `Pricing::init`): `get_price()` = base,
+  `get_regular_price()` = raw, `get_sale_price()` = base when discounted else '' — so
+  `is_on_sale()` / `get_price_html()` render struck regular + sale natively. Cart line
+  objects get their captured unit price, with the discount added back for regular.
 - `sync_price_meta` writes `_price` = base; if discounted, `_regular_price` =
   raw and `_sale_price` = base (so shop/category shows struck regular + sale
   natively, no labels). Single product page renders its own dual price with

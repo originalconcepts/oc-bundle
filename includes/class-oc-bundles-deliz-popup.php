@@ -13,6 +13,10 @@
  *   2. Appends a rendered components block to the popup REST payload.
  *   3. Copies the chosen swaps from the add-to-cart JSON body into $_POST,
  *      where OC_Bundles_Cart::add_cart_item_data expects to find them.
+ *   4. Gives a bundle's contents a full-width line under its float-cart row
+ *      instead of the theme's narrow details column, with the theme's edit button
+ *      under it (oc-bundles-deliz-cart.js). The popup then reopens with the swaps
+ *      that cart line holds — see requested_selection().
  *
  * @package OC_Bundles
  */
@@ -120,6 +124,30 @@ class OC_Bundles_Deliz_Popup {
 			self::asset_version( 'assets/js/oc-bundles-deliz-popup.js' ),
 			true
 		);
+
+		// The float cart is on every storefront view, not only where a popup opens.
+		wp_enqueue_style(
+			'oc-bundles-deliz-cart',
+			OC_BUNDLES_URL . 'assets/css/oc-bundles-deliz-cart.css',
+			array(),
+			self::asset_version( 'assets/css/oc-bundles-deliz-cart.css' )
+		);
+		wp_enqueue_script(
+			'oc-bundles-deliz-cart',
+			OC_BUNDLES_URL . 'assets/js/oc-bundles-deliz-cart.js',
+			array(),
+			self::asset_version( 'assets/js/oc-bundles-deliz-cart.js' ),
+			true
+		);
+		wp_localize_script(
+			'oc-bundles-deliz-cart',
+			'ocBundlesDelizCart',
+			array(
+				// The theme's own wording, so the bundle's button reads like every other row's.
+				'editLabel' => __( 'Edit', 'deliz-short' ), // phpcs:ignore WordPress.WP.I18n.TextDomainMismatch
+				'editAria'  => __( 'Edit product', 'deliz-short' ), // phpcs:ignore WordPress.WP.I18n.TextDomainMismatch
+			)
+		);
 	}
 
 	/**
@@ -182,7 +210,7 @@ class OC_Bundles_Deliz_Popup {
 			return $response;
 		}
 
-		$payload = self::build_bundle_payload( $product );
+		$payload = self::build_bundle_payload( $product, self::requested_selection( $request ) );
 		if ( $payload ) {
 			$data['oc_bundle'] = $payload;
 			$response->set_data( $data );
@@ -192,12 +220,39 @@ class OC_Bundles_Deliz_Popup {
 	}
 
 	/**
+	 * Swap choices sent when the float cart's edit button reopens a bundle line
+	 * (index => swap index), so the popup shows the bundle the customer put together.
+	 * An index or swap that isn't valid for the bundle is dropped by resolve_components().
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return array
+	 */
+	protected static function requested_selection( $request ) {
+		$raw = $request->get_param( 'oc_bundle_selection' );
+		if ( ! is_string( $raw ) || '' === $raw ) {
+			return array();
+		}
+		$decoded = json_decode( $raw, true );
+		if ( ! is_array( $decoded ) ) {
+			return array();
+		}
+		$selection = array();
+		foreach ( $decoded as $index => $key ) {
+			if ( is_numeric( $index ) && is_numeric( $key ) && (int) $key >= 0 ) {
+				$selection[ (int) $index ] = (int) $key;
+			}
+		}
+		return $selection;
+	}
+
+	/**
 	 * Build the components block exactly as the plugin's own template would.
 	 *
-	 * @param WC_Product $product Bundle product.
+	 * @param WC_Product $product   Bundle product.
+	 * @param array      $selection Swap choices to open with (index => swap index).
 	 * @return array|null
 	 */
-	protected static function build_bundle_payload( $product ) {
+	protected static function build_bundle_payload( $product, $selection = array() ) {
 		if ( ! class_exists( 'OC_Bundles_Helpers' ) || ! class_exists( 'OC_Bundles_Frontend' ) ) {
 			return null;
 		}
@@ -210,7 +265,7 @@ class OC_Bundles_Deliz_Popup {
 
 		// Mirror OC_Bundles_Frontend::render(): auto-swap out-of-stock components
 		// so display and pricing match the single-product template.
-		$selection = OC_Bundles_Helpers::apply_auto_swaps( $config, array() );
+		$selection = OC_Bundles_Helpers::apply_auto_swaps( $config, $selection );
 		$resolved  = OC_Bundles_Cart::resolve_components( $config, $selection );
 		$applied   = $resolved['selection'];
 
@@ -227,7 +282,8 @@ class OC_Bundles_Deliz_Popup {
 			'base_price'      => (float) $base,
 			'discount_amount' => (float) $discount,
 			'price'           => (float) $price,
-			'price_html'      => wc_price( $price ),
+			// Discounted: regular struck through, then the sale price — WooCommerce's sale format.
+			'price_html'      => $discount > 0 ? wc_format_sale_price( wc_price( $price + $discount ), wc_price( $price ) ) : wc_price( $price ),
 			'layout'          => isset( $config['layout'] ) ? $config['layout'] : 'grid',
 			'count'           => count( $config['components'] ),
 			'selection'       => (object) $selection,

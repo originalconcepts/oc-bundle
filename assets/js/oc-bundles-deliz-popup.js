@@ -15,12 +15,16 @@
  *     posts JSON to its own ed/v1/add-to-cart route, so we add the selection to
  *     that body here and copy it into $_POST server-side (see the PHP class),
  *     which is where OC_Bundles_Cart::add_cart_item_data reads it from.
+ *
+ * It also gives bundles the theme's opening scroll nudge (see below), and keeps a
+ * discounted bundle's price in WooCommerce's sale format after a swap.
  */
 ( function () {
 	'use strict';
 
 	var PRICE_SELECTOR = '.ed-product-popup__price-value';
 	var ADD_TO_CART_ROUTE = '/ed/v1/add-to-cart';
+	var POPUP_ROUTE = '/ed/v1/product-popup';
 
 	/* ---------------------------------------------------------------- markup */
 
@@ -192,16 +196,42 @@
 		return input ? ( input.value || '{}' ) : null;
 	}
 
+	// Same rules as formatPrice() in oc-bundles.js, wrapped the way wc_price() wraps.
+	function formatAmount( amount ) {
+		var c = ( window.ocBundles && window.ocBundles.currency ) || {};
+		var dec = parseInt( c.decimals, 10 );
+		if ( isNaN( dec ) ) {
+			dec = 2;
+		}
+		var parts = Math.abs( amount ).toFixed( dec ).split( '.' );
+		parts[ 0 ] = parts[ 0 ].replace( /\B(?=(\d{3})+(?!\d))/g, c.thousandSep || ',' );
+		var num = parts.join( dec > 0 ? ( c.decimalSep || '.' ) : '' );
+		var str = ( c.format || '%1$s%2$s' ).replace( '%1$s', c.symbol || '' ).replace( '%2$s', num );
+		return '<span class="woocommerce-Price-amount amount"><bdi>' + ( amount < 0 ? '-' : '' ) + str + '</bdi></span>';
+	}
+
 	function syncPrice() {
 		var popup = document.getElementById( 'ed-product-popup' );
 		if ( ! popup ) {
 			return;
 		}
-		var mirror = popup.querySelector( '.oc-bundle--in-popup .oc-add-price' );
+		var bundle = popup.querySelector( '.oc-bundle--in-popup' );
+		var mirror = bundle ? bundle.querySelector( '.oc-add-price' ) : null;
 		var target = popup.querySelector( PRICE_SELECTOR );
-		if ( mirror && target && mirror.innerHTML.trim() ) {
-			target.innerHTML = mirror.innerHTML;
+		if ( ! mirror || ! target || ! mirror.innerHTML.trim() ) {
+			return;
 		}
+		var sale = parseFloat( mirror.getAttribute( 'data-amount' ) );
+		if ( isNaN( sale ) ) {
+			target.innerHTML = mirror.innerHTML;
+			return;
+		}
+		// A discounted bundle keeps WooCommerce's sale format — regular struck through,
+		// sale after it — which the theme colours like any other product on sale.
+		var discount = parseFloat( bundle.getAttribute( 'data-discount-amount' ) ) || 0;
+		target.innerHTML = discount > 0
+			? '<del aria-hidden="true">' + formatAmount( sale + discount ) + '</del> <ins>' + formatAmount( sale ) + '</ins>'
+			: formatAmount( sale );
 	}
 
 	if ( window.jQuery ) {
@@ -209,6 +239,97 @@
 		window.jQuery( document ).on( 'click', '.oc-swap-apply', function () {
 			setTimeout( syncPrice, 0 );
 		} );
+	}
+
+	/* ----------------------------------------------------------- scroll nudge */
+
+	// When there is more below the fold the theme opens its product modal with a short
+	// scroll down and back, but it skips bundles on purpose: its bottom fade looked like
+	// a broken bar over the component headings. Bundles get the nudge alone, with the
+	// theme's own timing, so they hint at the rest of the list like any other product.
+	var reduceMotion = window.matchMedia && window.matchMedia( '(prefers-reduced-motion: reduce)' ).matches;
+
+	function easeInOut( p ) {
+		return p < 0.5 ? 2 * p * p : 1 - Math.pow( -2 * p + 2, 2 ) / 2;
+	}
+
+	function animateScroll( el, from, to, duration, done ) {
+		var started = null;
+		function step( now ) {
+			if ( started === null ) {
+				started = now;
+			}
+			var p = Math.min( 1, ( now - started ) / duration );
+			el.scrollTop = from + ( to - from ) * easeInOut( p );
+			if ( p < 1 ) {
+				window.requestAnimationFrame( step );
+			} else if ( done ) {
+				done();
+			}
+		}
+		window.requestAnimationFrame( step );
+	}
+
+	function nudgeBundle( popup ) {
+		var tries = 0;
+		( function check() {
+			if ( ! popup.classList.contains( 'is-open' ) ) {
+				return;
+			}
+			var scroller = popup.querySelector( '.ed-product-popup__content' );
+			var overflow = scroller ? scroller.scrollHeight - scroller.clientHeight : 0;
+			if ( ! scroller || ! popup.querySelector( '.oc-bundle--in-popup' ) || overflow <= 24 ) {
+				if ( tries++ < 60 ) {
+					setTimeout( check, 90 );
+				}
+				return;
+			}
+			setTimeout( function () {
+				// A theme that hints bundles itself keeps its fade element in place — leave it
+				// to the theme rather than nudging twice.
+				if ( ! popup.classList.contains( 'is-open' ) || popup.querySelector( '.ed-pp-scrollhint' ) ) {
+					return;
+				}
+				var start = scroller.scrollTop;
+				var distance = Math.min( 46, overflow );
+				animateScroll( scroller, start, start + distance, 340, function () {
+					setTimeout( function () {
+						if ( popup.classList.contains( 'is-open' ) ) {
+							animateScroll( scroller, start + distance, start, 400 );
+						}
+					}, 280 );
+				} );
+			}, 300 );
+		} )();
+	}
+
+	function watchPopup( popup ) {
+		if ( popup.__ocBundlesNudge ) {
+			return;
+		}
+		popup.__ocBundlesNudge = true;
+		var wasOpen = popup.classList.contains( 'is-open' );
+		new MutationObserver( function () {
+			var open = popup.classList.contains( 'is-open' );
+			if ( open && ! wasOpen ) {
+				nudgeBundle( popup );
+			}
+			wasOpen = open;
+		} ).observe( popup, { attributes: true, attributeFilter: [ 'class' ] } );
+		if ( wasOpen ) {
+			nudgeBundle( popup );
+		}
+	}
+
+	if ( ! reduceMotion && window.MutationObserver && document.body ) {
+		var findPopup = function () {
+			var popup = document.querySelector( '.ed-product-popup' );
+			if ( popup ) {
+				watchPopup( popup );
+			}
+		};
+		new MutationObserver( findPopup ).observe( document.body, { childList: true, subtree: true } );
+		findPopup();
 	}
 
 	/* ------------------------------------------------- add-to-cart bridging */
@@ -223,6 +344,18 @@
 		window.fetch = function ( input, init ) {
 			try {
 				var url = ( typeof input === 'string' ) ? input : ( input && input.url );
+
+				// Reopening a bundle from the float cart's edit button: ask the popup payload for
+				// the swaps that line holds, so the popup shows the customer's own bundle.
+				var pending = window.ocBundlesPendingEdit;
+				if ( pending && typeof input === 'string' && input.indexOf( POPUP_ROUTE ) !== -1 && Date.now() - pending.at < 4000 ) {
+					var id = input.match( /[?&]id=(\d+)/ );
+					if ( id && id[ 1 ] === String( pending.productId ) ) {
+						window.ocBundlesPendingEdit = null;
+						var withSelection = input + ( input.indexOf( '?' ) === -1 ? '?' : '&' ) + 'oc_bundle_selection=' + encodeURIComponent( pending.selection );
+						return originalWindowFetch.call( this, withSelection, init );
+					}
+				}
 				if ( url && String( url ).indexOf( ADD_TO_CART_ROUTE ) !== -1 && init && typeof init.body === 'string' ) {
 					var selection = currentSelectionValue();
 					if ( selection ) {

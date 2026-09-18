@@ -153,18 +153,52 @@ class OC_Bundles_Cart {
 
 		if ( 'line' === $config['cart_display'] ) {
 			$lines = OC_Bundles_Helpers::components_list_lines( $cart_item['oc_bundle']['components'] );
-			$value = empty( $lines ) ? '' : esc_html( implode( ' · ', $lines ) );
+			$value = empty( $lines ) ? '' : '<span class="oc-cart-inline">' . esc_html( implode( ' · ', $lines ) ) . '</span>';
 		} else {
 			$value = OC_Bundles_Helpers::components_rows_html( $cart_item['oc_bundle']['components'] );
 		}
 
 		if ( '' !== $value ) {
+			$label = __( "What's in the bundle", 'oc-bundles' );
+			// The class and data attributes let a theme integration lift the contents out of a
+			// narrow cart column onto a line of their own, and reopen the line for editing with
+			// the customer's own swaps (see assets/js/oc-bundles-deliz-cart.js).
+			$attributes = array(
+				'class'             => 'oc-bundle-contents',
+				'data-oc-label'     => $label,
+				'data-oc-bundle-id' => (int) $cart_item['product_id'],
+				'data-oc-quantity'  => wc_format_decimal( $cart_item['quantity'] ),
+				'data-oc-selection' => wp_json_encode( (object) self::selection_keys( $cart_item ) ),
+			);
+			$attr_html = '';
+			foreach ( $attributes as $name => $attr_value ) {
+				$attr_html .= ' ' . $name . '="' . esc_attr( $attr_value ) . '"';
+			}
 			$item_data[] = array(
-				'key'   => __( "What's in the bundle", 'oc-bundles' ),
-				'value' => $value,
+				'key'   => $label,
+				'value' => '<span' . $attr_html . '>' . $value . '</span>',
 			);
 		}
 		return $item_data;
+	}
+
+	/**
+	 * A cart line's swap choices in the form the popup and add-to-cart use: index => swap index.
+	 *
+	 * @param array $cart_item Cart item.
+	 * @return array
+	 */
+	public static function selection_keys( $cart_item ) {
+		$keys = array();
+		if ( empty( $cart_item['oc_bundle']['selection'] ) || ! is_array( $cart_item['oc_bundle']['selection'] ) ) {
+			return $keys;
+		}
+		foreach ( $cart_item['oc_bundle']['selection'] as $index => $applied ) {
+			if ( is_array( $applied ) && isset( $applied['swap_index'] ) ) {
+				$keys[ (string) $index ] = (int) $applied['swap_index'];
+			}
+		}
+		return $keys;
 	}
 
 	/**

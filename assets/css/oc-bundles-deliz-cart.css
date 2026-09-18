@@ -1,0 +1,70 @@
+/**
+ * OC Bundles — Deliz float cart.
+ *
+ * assets/js/oc-bundles-deliz-cart.js moves a bundle's contents out of the theme's
+ * narrow details column onto a line of its own under the cart row. Only the plugin's
+ * own elements are styled here; the theme's row is left exactly as the theme lays it out.
+ */
+
+.oc-bundle-cart-contents {
+	margin-block-start: 10px;
+	font-size: 13px;
+	line-height: 1.45;
+	color: #4a4a4a;
+}
+
+.oc-bundle-cart-contents__label {
+	margin-block-end: 4px;
+	font-weight: 600;
+	color: var(--item-title-color, var(--main-site-text-color-general, #000));
+}
+
+.oc-bundle-cart-contents .oc-bundle-contents,
+.oc-bundle-cart-contents .oc-cart-lines,
+.oc-bundle-cart-contents .oc-cart-inline {
+	display: block;
+}
+
+.oc-bundle-cart-contents .oc-cart-line {
+	margin: 0 0 3px;
+	padding-inline-start: 0;
+}
+
+.oc-bundle-cart-contents .oc-cart-name {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+/* On wide screens the theme hangs the row's edit button 22px below the details
+   column; keep the contents clear of it when the row has one. */
+@media (min-width: 1200px) {
+	.ed-float-cart__item:has(.ed-float-cart__details .ed-float-cart__edit-btn) > .oc-bundle-cart-contents {
+		margin-block-start: 28px;
+	}
+}
+
+/* The bundle's edit button uses the theme's own class, so it looks and behaves like every
+   other row's; it just sits under the contents list instead of under the name column. */
+.ed-float-cart__items .ed-float-cart__item .oc-bundle-cart-contents .ed-float-cart__edit-btn {
+	position: static;
+	display: block;
+	margin: 8px 0 0;
+}
+
+/* On wide screens the theme shows edit buttons only while the row is hovered. Same here,
+   but the space stays reserved so the row doesn't jump. */
+@media (min-width: 1200px) {
+	.ed-float-cart__items .ed-float-cart__item .oc-bundle-cart-contents .ed-float-cart__edit-btn {
+		visibility: hidden;
+	}
+	.ed-float-cart__items .ed-float-cart__item:hover .oc-bundle-cart-contents .ed-float-cart__edit-btn {
+		visibility: visible;
+	}
+}
+
+/* Until the script has moved it — or if it never runs — the block must not widen the
+   details column: that is what pushed the quantity and price out of the cart. */
+.ed-float-cart__details .oc-bundle-contents {
+	display: block;
+	contain: inline-size;
+}

@@ -65,6 +65,14 @@ For a private repo or to avoid GitHub rate limits, add a token:
 == Changelog ==
 
 = 1.5.1 =
+* Merged with 1.4.7: a bundle split for the invoice keeps the ordinary component lines
+  (product name, shipped quantity in the quantity column, unit as meta). Weighed
+  quantities pushed by an integration (oc_bundles_update_order_line `actual_qty`) are
+  written to those line quantities, so the order screen and the integration see the
+  same numbers; a line whose total the integration owns is never re-priced or "put
+  back" by an admin re-weigh - it keeps the pushed amount. Component lines are linked
+  to their bundle line by its uid (1.4.7) and, once saved, by its item id
+  (`_oc_bundle_parent_item`, what Giorgio reads).
 * Pricing: a component ordered by units but priced per kg (OC Sale Units "sold by
   units" with a unit weight - e.g. a ~200 g portion of a 145/kg product) now costs
   price x unit weight per unit in a "sum" bundle, exactly like the same product on a
@@ -111,6 +119,62 @@ For a private repo or to avoid GitHub rate limits, add a token:
   bundle is its pre-discount base, so it reads as "on sale" when discounted. New
   setting under Settings → Bundles API (on by default) restores the old ordering
   when turned off.
+
+= 1.4.7 =
+* Orders: a bundle split for the invoice now lists each component as an ordinary
+  WooCommerce line — the product's name, the quantity that ships in the quantity column,
+  and its unit — instead of spelling the quantity out in the name. The shop re-weighs a
+  component by editing that line's quantity, like any weighable product; saving settles
+  stock by the difference, and re-prices only when the bundle is set to. The separate
+  "Weighed quantities" table under the bundle line no longer appears for these orders
+  (it stays for orders without component lines).
+* Component lines are tied to their own bundle line, so two lines of the same bundle in
+  one order are never mixed up.
+* Order line changes through the WooCommerce REST API settle component stock too.
+* Removing a component line from the order (or saving it at quantity 0) returns that
+  component's stock, the same as removing any WooCommerce line.
+* Like any WooCommerce line, a component line is edited while the order is in an
+  editable status (pending payment / on hold).
+
+= 1.4.6 =
+* Deliz float cart: a bundle line now has the theme's "Edit" button under its contents
+  list, looking and behaving like every other row's. It opens the product popup with the
+  bundle exactly as the customer put it together — quantity and chosen swaps, with the
+  matching price — and saving replaces the cart line with the changes.
+* The popup REST payload accepts oc_bundle_selection (index => swap index) to open with
+  given swaps; invalid choices are ignored.
+
+= 1.4.5 =
+* A discounted bundle now reports its prices the way WooCommerce expects: regular =
+  before the bundle discount, sale = after it. Everywhere a product on sale shows its
+  regular price struck through and the sale price in the theme's sale colour — the
+  product popup, shop cards, the block cart — a bundle now does too. Before, the
+  regular price was reported already discounted, so the bundle never counted as on
+  sale and its price showed in plain black. Cart lines add their swap surcharges to both.
+* Note: a discounted bundle is now "on sale" for WooCommerce, so a coupon set to
+  exclude sale items skips it, as it does any other product on sale.
+* Deliz popup: bundles get the theme's opening scroll nudge (a short scroll down and
+  back when the list continues below the fold). The theme skips bundles for its fade;
+  the plugin adds only the nudge, with the theme's timing.
+
+= 1.4.4 =
+* Deliz float cart: a bundle shown with its contents (as rows, or as a one-line list)
+  now keeps exactly the cart row every other product has — thumbnail, name, quantity
+  and price where the theme puts them — and lists its contents on a full-width line
+  under that row. The contents used to sit inside the theme's narrow name column,
+  widening it and pushing the quantity and price out of the cart with a sideways scroll.
+* Done in the plugin only: the cart item data carries a marker class and label, and a
+  small script moves just that block. No theme styles are overridden.
+
+= 1.4.3 =
+* Reverted the mini-cart layout overrides added in 1.4.1/1.4.2. They reshaped the
+  theme's own cart row (display:contents on its detail wrapper, flex-wrap and
+  ordering on the row) to win width for the bundle contents. That is the theme's
+  layout to own, not the plugin's, and it moved the item's variations/meta and the
+  quantity and price out of their proper places. The theme now lays its cart row
+  out exactly as it did before the plugin was involved.
+* The plugin-side fixes are kept: contents no longer break mid-word, and they keep
+  a small inset from the product image.
 
 = 1.4.2 =
 * Mini-cart: the bundle's quantity and price now stay on the first row beside the

@@ -8,11 +8,11 @@
  * work — a component ordered at 0.5 kg and weighed at 0.6 kg gives 0.5 at checkout and a
  * further 0.1 when the order is saved, never 0.6 on top of 0.5.
  *
- * A bundle is a single order line whose quantity counts bundles, not kilos, so there is no
- * line quantity to edit per component the way there is for a plain weighable product. The
- * weighed amount therefore lives in its own meta, set on the order screen or pushed in by
- * an external system, and is expressed as the TOTAL for the line (all bundles together),
- * matching WooCommerce's line-quantity semantics.
+ * A bundle line's quantity counts bundles, not kilos. When the order is split for the invoice
+ * (1.4.7+), each component has its own line whose QUANTITY is what ships, so the shop
+ * re-weighs a component the WooCommerce way — by editing that line — and saving applies the
+ * difference. Orders without such lines keep the weighed amounts in their own meta, entered in
+ * a table under the bundle line. Either way the amount is the TOTAL for the line (all bundles).
  *
  * @package OC_Bundles
  */
@@ -42,6 +42,10 @@ class OC_Bundles_Order {
 		// Weighed quantities on the order screen.
 		add_action( 'woocommerce_after_order_itemmeta', array( __CLASS__, 'render_actuals' ), 10, 2 );
 		add_action( 'woocommerce_saved_order_items', array( __CLASS__, 'save_actuals' ), 10, 2 );
+		add_filter( 'woocommerce_quantity_input_step_admin', array( __CLASS__, 'admin_quantity_step' ), 10, 2 );
+
+		// Line quantities changed over the WooCommerce REST API (e.g. weights from a POS).
+		add_action( 'woocommerce_rest_insert_shop_order_object', array( __CLASS__, 'after_rest_update' ), 20, 1 );
 	}
 
 	/* --------------------------------------------------------------------- *
@@ -86,6 +90,7 @@ class OC_Bundles_Order {
 
 		$dirty    = false;
 		$repriced = false;
+		$restored = false;
 
 		foreach ( $order->get_items() as $item ) {
 			$components = $item->get_meta( '_oc_bundle_components' );
@@ -95,9 +100,27 @@ class OC_Bundles_Order {
 
 			$bundle_qty = max( 1, (int) $item->get_quantity() );
 			$ledger     = self::ledger( $item, $components, $bundle_qty );
-			$actual     = $item->get_meta( self::ACTUAL );
-			$actual     = is_array( $actual ) ? $actual : array();
+			$saved      = $item->get_meta( self::ACTUAL );
+			$saved      = is_array( $saved ) ? $saved : array();
+			$actual     = $saved;
 			$changed    = false;
+
+			// Component lines that hold their own quantity ARE the weighed amounts — whatever
+			// the order screen (or the REST API) last saved on them. One that no longer matches
+			// the amount settled last time has just been re-weighed.
+			$lines     = self::component_lines( $order, $item );
+			$reweighed = array();
+			foreach ( self::weighed_quantities( $item, $components, $lines ) as $index => $qty ) {
+				$was = self::wanted( OC_Bundles_Helpers::normalize_component( $components[ $index ] ), $index, $saved, $bundle_qty );
+				if ( 0.0 !== round( $qty - $was, 4 ) ) {
+					$reweighed[ $index ] = true;
+				}
+				$actual[ $index ] = $qty;
+			}
+			if ( $actual !== $saved ) {
+				$item->update_meta_data( self::ACTUAL, $actual );
+				$changed = true;
+			}
 
 			foreach ( $components as $index => $component ) {
 				$component = OC_Bundles_Helpers::normalize_component( $component, $index );
@@ -133,8 +156,12 @@ class OC_Bundles_Order {
 				$dirty = true;
 			}
 
-			if ( ! $release && self::maybe_reprice( $order, $item, $components, $actual, $bundle_qty, $persist ) ) {
-				$repriced = true;
+			if ( ! $release ) {
+				if ( self::maybe_reprice( $order, $item, $components, $actual, $bundle_qty, $persist ) ) {
+					$repriced = true;
+				} elseif ( ! empty( $reweighed ) && self::restore_amounts( $lines, $reweighed, $persist ) ) {
+					$restored = true;
+				}
 			}
 		}
 
@@ -142,6 +169,11 @@ class OC_Bundles_Order {
 			// Line totals moved, so let WooCommerce re-derive taxes and the order total
 			// from them -- the same thing the "Recalculate" button does.
 			$order->calculate_totals( true );
+			$dirty = true;
+		} elseif ( $restored && $persist ) {
+			// Amounts and their taxes are back to what checkout gave them; re-add the order.
+			$order->update_taxes();
+			$order->calculate_totals( false );
 			$dirty = true;
 		}
 
@@ -188,8 +220,10 @@ class OC_Bundles_Order {
 		// Nothing weighed yet (checkout / a status change before picking): the line keeps the
 		// price the cart charged. Re-pricing here would replace "original price + swap surcharge"
 		// with the swapped product's own price x the slot quantity, and the customer would see a
-		// different total on the order than on the cart.
-		if ( empty( $actual ) ) {
+		// different total on the order than on the cart. "Weighed" means a quantity that differs
+		// from the ordered one - component lines that hold their own quantity (1.4.7+) report the
+		// ordered amount until someone edits them.
+		if ( ! self::has_reweighed_component( $components, $actual, $bundle_qty ) ) {
 			return false;
 		}
 
@@ -246,13 +280,16 @@ class OC_Bundles_Order {
 		if ( ! empty( $split ) ) {
 			foreach ( $split as $index => $line ) {
 				$amount = isset( $amounts[ $index ] ) ? $amounts[ $index ] : 0;
-				$label  = isset( $labels[ $index ] ) ? $labels[ $index ] : $line->get_name();
+				// A line holding its own quantity keeps the product name; only an older line that
+				// spells the quantity out in its name has to be renamed.
+				$label = ( ! $line->get_meta( OC_Bundles_Invoice::QTY_LINE ) && isset( $labels[ $index ] ) ) ? $labels[ $index ] : $line->get_name();
 				if ( (float) $line->get_total() === (float) $amount && $line->get_name() === $label ) {
 					continue;
 				}
 				$line->set_name( $label );
 				$line->set_subtotal( $amount );
 				$line->set_total( $amount );
+				$line->update_meta_data( OC_Bundles_Invoice::AMOUNT, $amount );
 				if ( $persist ) {
 					$line->save();
 				}
@@ -279,14 +316,14 @@ class OC_Bundles_Order {
 	/**
 	 * The invoice-split lines belonging to a bundle line, keyed by component index.
 	 *
-	 * A bundle line that still carries the split token (unsaved, split in memory) owns
-	 * exactly the lines whose parent token equals it. A saved bundle line owns the lines
-	 * that carry its item id. Lines with neither link (split before 1.5.0) are matched by
-	 * bundle product only for a parent without a token (ambiguous only when the same
-	 * bundle appears twice in one order).
+	 * Lines split since 1.4.7 are tied to their bundle line by LINE_UID (set before the line
+	 * is ever saved), so two lines of the same bundle in one order never mix. A saved bundle
+	 * line's component lines also carry its item id (PARENT_ITEM, what integrations read).
+	 * Older lines with neither link are matched by bundle product — only for a parent that
+	 * has no uid itself.
 	 *
-	 * @param WC_Order              $order Order.
-	 * @param WC_Order_Item_Product $item  Bundle line item.
+	 * @param WC_Order      $order Order.
+	 * @param WC_Order_Item $item  Bundle line.
 	 * @return array
 	 */
 	public static function component_lines( $order, $item ) {
@@ -295,26 +332,26 @@ class OC_Bundles_Order {
 		}
 		$bundle_id = (int) $item->get_product_id();
 		$parent_id = (int) $item->get_id();
-		$token     = (string) $item->get_meta( OC_Bundles_Invoice::TOKEN );
+		$uid       = (string) $item->get_meta( OC_Bundles_Invoice::LINE_UID );
 		$lines     = array();
 		foreach ( $order->get_items() as $line ) {
 			if ( (int) $line->get_meta( OC_Bundles_Invoice::MARKER ) !== $bundle_id ) {
 				continue;
 			}
-			$linked     = (string) $line->get_meta( OC_Bundles_Invoice::PARENT );
-			$line_token = (string) $line->get_meta( OC_Bundles_Invoice::PARENT_TOKEN );
-			if ( '' !== $linked ) {
-				// Saved line: it must carry THIS parent's item id.
-				if ( ! $parent_id || (int) $linked !== $parent_id ) {
+			$line_uid = (string) $line->get_meta( OC_Bundles_Invoice::PARENT );
+			$linked   = (int) $line->get_meta( OC_Bundles_Invoice::PARENT_ITEM );
+			if ( '' !== $line_uid ) {
+				// Linked by uid: it must be THIS parent's uid.
+				if ( $line_uid !== $uid ) {
 					continue;
 				}
-			} elseif ( '' !== $line_token ) {
-				// Unsaved line: it must carry THIS parent's token.
-				if ( '' === $token || $line_token !== $token ) {
+			} elseif ( $linked > 0 ) {
+				// Linked by item id only (split by an integration before the uid existed).
+				if ( ! $parent_id || $linked !== $parent_id ) {
 					continue;
 				}
-			} elseif ( '' !== $token ) {
-				// A legacy (unlinked) line can never belong to a parent that is still unsaved.
+			} elseif ( '' !== $uid ) {
+				// A legacy (unlinked) line can never belong to a parent that carries a uid.
 				continue;
 			}
 			$index = $line->get_meta( OC_Bundles_Invoice::INDEX );
@@ -324,6 +361,139 @@ class OC_Bundles_Order {
 			$lines[ (int) $index ] = $line;
 		}
 		return $lines;
+	}
+
+	/**
+	 * Quantities held by component lines that carry their own quantity, by index.
+	 *
+	 * @param array $lines Component lines by index.
+	 * @return array
+	 */
+	protected static function line_quantities( $lines ) {
+		$quantities = array();
+		foreach ( $lines as $index => $line ) {
+			if ( $line->get_meta( OC_Bundles_Invoice::QTY_LINE ) ) {
+				$quantities[ $index ] = max( 0.0, (float) $line->get_quantity() );
+			}
+		}
+		return $quantities;
+	}
+
+	/**
+	 * The weighed amounts a bundle line's component lines hold, by component index.
+	 *
+	 * For a bundle split into lines that carry their own quantity (1.4.7+), a component whose
+	 * line was removed from the order — WooCommerce deletes a line saved at quantity 0 — ships
+	 * nothing, so its stock goes back like any removed line's.
+	 *
+	 * @param WC_Order_Item_Product $item       Bundle line.
+	 * @param array                 $components Components.
+	 * @param array                 $lines      Component lines by index.
+	 * @return array
+	 */
+	protected static function weighed_quantities( $item, $components, $lines ) {
+		if ( ! class_exists( 'OC_Bundles_Invoice' ) ) {
+			return array();
+		}
+		$quantities = self::line_quantities( $lines );
+		if ( $item->get_meta( OC_Bundles_Invoice::QTY_LINES ) ) {
+			foreach ( $components as $index => $component ) {
+				if ( ! isset( $lines[ $index ] ) && OC_Bundles_Helpers::effective_id( OC_Bundles_Helpers::normalize_component( $component ) ) ) {
+					$quantities[ $index ] = 0.0;
+				}
+			}
+		}
+		return array_intersect_key( $quantities, $components );
+	}
+
+	/**
+	 * Put a re-weighed component line's amount and taxes back to what checkout gave it.
+	 *
+	 * The order screen scales a line's total with its quantity as you type. That is right for
+	 * a product priced by weight, but a bundle component either costs nothing extra or carries
+	 * a flat swap surcharge, so unless the bundle re-prices on re-weigh (maybe_reprice) its
+	 * amount must not move.
+	 *
+	 * @param array $lines     Component lines by index.
+	 * @param array $reweighed Indexes whose quantity just changed.
+	 * @param bool  $persist   False to change the in-memory lines only.
+	 * @return bool True when an amount was put back.
+	 */
+	protected static function restore_amounts( $lines, $reweighed, $persist = true ) {
+		$restored = false;
+		foreach ( array_keys( $reweighed ) as $index ) {
+			if ( ! isset( $lines[ $index ] ) ) {
+				continue;
+			}
+			$line   = $lines[ $index ];
+			$amount = $line->get_meta( OC_Bundles_Invoice::AMOUNT );
+			if ( '' === (string) $amount || (float) $line->get_total() === (float) $amount ) {
+				continue;
+			}
+			$line->set_subtotal( (float) $amount );
+			$line->set_total( (float) $amount );
+			$taxes = $line->get_meta( OC_Bundles_Invoice::TAXES );
+			if ( is_array( $taxes ) ) {
+				$line->set_taxes( $taxes );
+			}
+			if ( $persist ) {
+				$line->save();
+			}
+			$restored = true;
+		}
+		return $restored;
+	}
+
+	/**
+	 * Let a product-less order line (a bundle component) take a decimal quantity on the order
+	 * screen, like a weighable product line — on a store whose quantities keep fractions at all.
+	 *
+	 * @param string          $step    Input step.
+	 * @param WC_Product|bool $product Line product.
+	 * @return string
+	 */
+	public static function admin_quantity_step( $step, $product ) {
+		return ( ! $product && 0.5 === (float) wc_stock_amount( 0.5 ) ) ? 'any' : $step;
+	}
+
+	/**
+	 * Settle stock after an order update over the WooCommerce REST API — but only for an order
+	 * that has already taken its stock, so a freshly created one still waits for WooCommerce.
+	 *
+	 * @param WC_Order $order Order.
+	 */
+	public static function after_rest_update( $order ) {
+		if ( ! $order instanceof WC_Order ) {
+			return;
+		}
+		foreach ( $order->get_items() as $item ) {
+			if ( is_array( $item->get_meta( self::LEDGER ) ) ) {
+				self::reconcile( $order, false );
+				return;
+			}
+		}
+	}
+
+	/**
+	 * Whether any component's weighed quantity differs from what was ordered.
+	 *
+	 * @param array $components Components.
+	 * @param array $actual     Weighed quantities by index.
+	 * @param int   $bundle_qty Number of bundles.
+	 * @return bool
+	 */
+	protected static function has_reweighed_component( $components, $actual, $bundle_qty ) {
+		if ( empty( $actual ) ) {
+			return false;
+		}
+		foreach ( $components as $index => $component ) {
+			$component = OC_Bundles_Helpers::normalize_component( $component, $index );
+			$ordered   = (float) $component['qty'] * $bundle_qty;
+			if ( 0.0 !== round( self::wanted( $component, $index, $actual, $bundle_qty ) - $ordered, 4 ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -430,16 +600,23 @@ class OC_Bundles_Order {
 			return;
 		}
 
+		// A component whose own line holds its quantity is re-weighed on that line, like any
+		// order line, so the table lists only the rest — none, for a bundle split since 1.4.7.
+		$order = $item->get_order();
+		$held  = ( $order instanceof WC_Order ) ? self::weighed_quantities( $item, $components, self::component_lines( $order, $item ) ) : array();
+
 		$bundle_qty = max( 1, (int) $item->get_quantity() );
 		$actual     = $item->get_meta( self::ACTUAL );
 		$actual     = is_array( $actual ) ? $actual : array();
 		$ledger     = $item->get_meta( self::LEDGER );
 		$ledger     = is_array( $ledger ) ? $ledger : array();
 
-		echo '<div class="oc-order-actuals"><strong>' . esc_html__( 'Weighed quantities', 'oc-bundles' ) . '</strong><table class="oc-order-actuals-table">';
-
+		$rows = '';
 		foreach ( $components as $index => $component ) {
-			$component = OC_Bundles_Helpers::normalize_component( $component, $index );
+			if ( isset( $held[ $index ] ) ) {
+				continue;
+			}
+			$component = OC_Bundles_Helpers::normalize_component( $component );
 			$pid       = OC_Bundles_Helpers::effective_id( $component );
 			$product   = $pid ? wc_get_product( $pid ) : false;
 			if ( ! $product ) {
@@ -451,7 +628,7 @@ class OC_Bundles_Order {
 			$taken   = isset( $ledger[ $index ] ) ? (float) $ledger[ $index ] : 0.0;
 			$suffix  = OC_Bundles_Helpers::display_suffix( $component['unit'], $component['unit_label'] );
 
-			printf(
+			$rows .= sprintf(
 				'<tr><td>%1$s</td><td><input type="number" step="any" min="0" name="oc_bundle_actual[%2$d][%3$s]" value="%4$s" placeholder="%5$s" class="oc-actual-input" /> %6$s</td><td class="oc-actual-taken">%7$s</td></tr>',
 				esc_html( $product->get_name() ),
 				(int) $item_id,
@@ -469,7 +646,11 @@ class OC_Bundles_Order {
 			);
 		}
 
-		echo '</table><p class="description">' . esc_html__( 'Leave empty to use the ordered quantity. Saving adjusts stock by the difference only.', 'oc-bundles' ) . '</p></div>';
+		if ( '' === $rows ) {
+			return;
+		}
+
+		echo '<div class="oc-order-actuals"><strong>' . esc_html__( 'Weighed quantities', 'oc-bundles' ) . '</strong><table class="oc-order-actuals-table">' . $rows . '</table><p class="description">' . esc_html__( 'Leave empty to use the ordered quantity. Saving adjusts stock by the difference only.', 'oc-bundles' ) . '</p></div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- every part of $rows is escaped as it is built.
 	}
 
 	/**
@@ -510,10 +691,13 @@ class OC_Bundles_Order {
 					continue;
 				}
 
-				$actual = array();
+				// Only the components listed in the table are posted; the others keep their amounts.
+				$actual = $item->get_meta( self::ACTUAL );
+				$actual = is_array( $actual ) ? $actual : array();
 				foreach ( $posted[ $item_id ] as $index => $value ) {
 					$value = wc_clean( $value );
 					if ( '' === $value ) {
+						unset( $actual[ absint( $index ) ] );
 						continue;
 					}
 					$actual[ absint( $index ) ] = max( 0, (float) $value );

@@ -6,8 +6,14 @@
  * With `invoice_display = components` the order shows:
  *
  *   Bundle name          x1     100.00   <- base price, without swap surcharges
- *     5 pcs Entrecote                    <- included in the bundle, no amount
- *     1 kg Lamb chops             5.00   <- this component's swap surcharge
+ *   Entrecote            x5              <- included in the bundle, no amount
+ *   Lamb chops           x1       5.00   <- this component's swap surcharge
+ *
+ * Each component line's quantity is what ships (per-bundle quantity times the number of
+ * bundles), with its unit as item meta — an ordinary WooCommerce line — so the shop
+ * re-weighs a component by editing that line's quantity (see OC_Bundles_Order). An
+ * integration that pushes weighed quantities (oc_bundles_update_order_line) writes them
+ * to the same line quantities.
  *
  * The order total never changes: whatever is taken off the bundle line is put
  * back on the component lines that caused it. Components included at no extra
@@ -32,14 +38,29 @@ class OC_Bundles_Invoice {
 	/** @var string Which component of the bundle this line represents. */
 	const INDEX = '_oc_bundle_component_index';
 
-	/** @var string Order item ID of the bundle line this component line was split from. */
-	const PARENT = '_oc_bundle_parent_item';
+	/** @var string On a component line: its quantity is the component's quantity (1.4.7+). */
+	const QTY_LINE = '_oc_bundle_component_qty_line';
 
-	/** @var string Temporary link used while the bundle line has no item id yet (on the bundle line). */
-	const TOKEN = '_oc_bundle_split_token';
+	/** @var string On a split bundle line: its component lines hold their own quantities (1.4.7+). */
+	const QTY_LINES = '_oc_bundle_qty_lines';
 
-	/** @var string Temporary link used while the bundle line has no item id yet (on the component line). */
-	const PARENT_TOKEN = '_oc_bundle_parent_token';
+	/** @var string On a split bundle line: tells it apart from other lines of the same bundle (set before it is ever saved). */
+	const LINE_UID = '_oc_bundle_line_uid';
+
+	/** @var string On a component line: the LINE_UID of the bundle line it belongs to. */
+	const PARENT = '_oc_bundle_component_parent';
+
+	/**
+	 * @var string On a component line: the order item ID of the bundle line, once that line has one.
+	 * Derived from the uid link after the save (backfill_parent_ids); what integrations (Giorgio) read.
+	 */
+	const PARENT_ITEM = '_oc_bundle_parent_item';
+
+	/** @var string On a component line: the amount checkout gave it. */
+	const AMOUNT = '_oc_bundle_component_amount';
+
+	/** @var string On a component line: the taxes checkout gave it. */
+	const TAXES = '_oc_bundle_component_taxes';
 
 
 	public static function init() {
@@ -108,13 +129,14 @@ class OC_Bundles_Invoice {
 	 * Link component lines that were split before their bundle line had an item id.
 	 *
 	 * Runs after every order save, when all items have ids. Two passes:
-	 *  1. By token — split_item() stamps a shared token on the bundle line and its
-	 *     component lines whenever the bundle line is still unsaved. Deterministic.
-	 *  2. Legacy lines (split before 1.5.0, no token) by bundle product and order of
+	 *  1. By uid — split_item() stamps a LINE_UID on the bundle line and the same value
+	 *     (PARENT) on its component lines, so the item id can be derived deterministically.
+	 *     The uid stays; only the item id (PARENT_ITEM) is added.
+	 *  2. Legacy lines (split before 1.4.7, no uid) by bundle product and order of
 	 *     appearance: the lines of one bundle line carry ascending component indexes,
 	 *     so an index that does not increase starts the next bundle line of the same
 	 *     product. Bundle lines that already have linked children are skipped.
-	 * Lines that already carry the link are left alone, so this is safe to repeat.
+	 * Lines that already carry the item id are left alone, so this is safe to repeat.
 	 *
 	 * @param WC_Order|int $order Order.
 	 */
@@ -126,11 +148,11 @@ class OC_Bundles_Invoice {
 			return;
 		}
 
-		$by_token = array(); // token => bundle line.
+		$by_uid   = array(); // uid => bundle line.
 		$parents  = array(); // bundle product id => bundle line item ids without linked children, in order.
 		$linked   = array(); // bundle line item ids that already have linked children.
-		$orphans  = array(); // bundle product id => component lines lacking the link, in order.
-		$tokened  = array(); // component lines carrying a parent token.
+		$orphans  = array(); // bundle product id => component lines lacking any link, in order.
+		$by_link  = array(); // component lines carrying a parent uid but no item id yet.
 		$bundles  = array(); // bundle lines, in order.
 
 		foreach ( $order->get_items() as $line ) {
@@ -139,13 +161,13 @@ class OC_Bundles_Invoice {
 			}
 			$marker = (string) $line->get_meta( self::MARKER );
 			if ( '' !== $marker ) {
-				$parent = (string) $line->get_meta( self::PARENT );
-				if ( '' !== $parent ) {
-					$linked[ (int) $parent ] = true;
+				$parent = (int) $line->get_meta( self::PARENT_ITEM );
+				if ( $parent > 0 ) {
+					$linked[ $parent ] = true;
 					continue;
 				}
-				if ( '' !== (string) $line->get_meta( self::PARENT_TOKEN ) ) {
-					$tokened[] = $line;
+				if ( '' !== (string) $line->get_meta( self::PARENT ) ) {
+					$by_link[] = $line;
 				} else {
 					$orphans[ (int) $marker ][] = $line;
 				}
@@ -156,34 +178,27 @@ class OC_Bundles_Invoice {
 				continue;
 			}
 			$bundles[] = $line;
-			$token     = (string) $line->get_meta( self::TOKEN );
-			if ( '' !== $token ) {
-				$by_token[ $token ] = $line;
+			$uid       = (string) $line->get_meta( self::LINE_UID );
+			if ( '' !== $uid ) {
+				$by_uid[ $uid ] = $line;
 			}
 		}
 
-		if ( empty( $tokened ) && empty( $orphans ) ) {
+		if ( empty( $by_link ) && empty( $orphans ) ) {
 			return;
 		}
 
-		// Pass 1: tokens.
-		$resolved_parents = array();
-		foreach ( $tokened as $line ) {
-			$token = (string) $line->get_meta( self::PARENT_TOKEN );
-			if ( ! isset( $by_token[ $token ] ) ) {
+		// Pass 1: uids.
+		foreach ( $by_link as $line ) {
+			$uid = (string) $line->get_meta( self::PARENT );
+			if ( ! isset( $by_uid[ $uid ] ) ) {
 				// Parent gone (removed before saving): nothing to link to.
 				continue;
 			}
-			$parent_id = (int) $by_token[ $token ]->get_id();
-			$line->update_meta_data( self::PARENT, $parent_id );
-			$line->delete_meta_data( self::PARENT_TOKEN );
+			$parent_id = (int) $by_uid[ $uid ]->get_id();
+			$line->update_meta_data( self::PARENT_ITEM, $parent_id );
 			$line->save();
-			$linked[ $parent_id ]           = true;
-			$resolved_parents[ $parent_id ] = $by_token[ $token ];
-		}
-		foreach ( $resolved_parents as $parent ) {
-			$parent->delete_meta_data( self::TOKEN );
-			$parent->save();
+			$linked[ $parent_id ] = true;
 		}
 
 		if ( empty( $orphans ) ) {
@@ -212,7 +227,7 @@ class OC_Bundles_Invoice {
 					$pos++;
 				}
 				$last = $index;
-				$line->update_meta_data( self::PARENT, (int) $ids[ $pos ] );
+				$line->update_meta_data( self::PARENT_ITEM, (int) $ids[ $pos ] );
 				$line->save();
 			}
 		}
@@ -221,7 +236,7 @@ class OC_Bundles_Invoice {
 	/**
 	 * Re-do the invoice split for one bundle line, IN MEMORY. When the bundle is
 	 * configured for a component breakdown, the component lines it already owns (linked
-	 * by item id, or by token while the bundle line is unsaved) are updated IN PLACE and
+	 * by its uid, or by item id) are updated IN PLACE and
 	 * only missing ones are added; otherwise its component lines are dropped. Nothing is
 	 * saved — the caller saves the order (removals are applied by WooCommerce on that save).
 	 *
@@ -270,9 +285,9 @@ class OC_Bundles_Invoice {
 	}
 
 	/**
-	 * The component lines a bundle line owns through an explicit link — its item id on
-	 * `_oc_bundle_parent_item`, or its split token on `_oc_bundle_parent_token` while it
-	 * is unsaved — keyed by component index, together with their order-item keys.
+	 * The component lines a bundle line owns through an explicit link — its uid on
+	 * PARENT, or its item id on PARENT_ITEM — keyed by component index, together with
+	 * their order-item keys.
 	 * Legacy unlinked lines are not included (see remove_split_lines()).
 	 *
 	 * @param WC_Order              $order Order.
@@ -286,7 +301,7 @@ class OC_Bundles_Invoice {
 	protected static function owned_split_lines( $order, $item ) {
 		$parent_id = (int) $item->get_id();
 		$bundle_id = (int) $item->get_product_id();
-		$token     = (string) $item->get_meta( self::TOKEN );
+		$uid       = (string) $item->get_meta( self::LINE_UID );
 		$lines     = array();
 		$keys      = array();
 		$extra     = array();
@@ -295,14 +310,14 @@ class OC_Bundles_Invoice {
 			if ( (int) $line->get_meta( self::MARKER ) !== $bundle_id ) {
 				continue;
 			}
-			$linked     = (string) $line->get_meta( self::PARENT );
-			$line_token = (string) $line->get_meta( self::PARENT_TOKEN );
-			if ( '' !== $linked ) {
-				if ( ! $parent_id || (int) $linked !== $parent_id ) {
+			$line_uid = (string) $line->get_meta( self::PARENT );
+			$linked   = (int) $line->get_meta( self::PARENT_ITEM );
+			if ( '' !== $line_uid ) {
+				if ( '' === $uid || $line_uid !== $uid ) {
 					continue;
 				}
-			} elseif ( '' !== $line_token ) {
-				if ( '' === $token || $line_token !== $token ) {
+			} elseif ( $linked > 0 ) {
+				if ( ! $parent_id || $linked !== $parent_id ) {
 					continue;
 				}
 			} else {
@@ -327,9 +342,9 @@ class OC_Bundles_Invoice {
 	/**
 	 * Remove the component lines belonging to a bundle line (queued; applied on save).
 	 *
-	 * Matches by parent item id (or by token while the bundle line is unsaved); lines
-	 * without either link (split before 1.5.0) are matched by bundle product only when
-	 * this is the sole line of that bundle in the order.
+	 * Matches by the bundle line's uid or item id; lines without either link (split
+	 * before 1.4.7) are matched by bundle product only when this is the sole line of
+	 * that bundle in the order.
 	 *
 	 * @param WC_Order              $order       Order.
 	 * @param WC_Order_Item_Product $item        Bundle line item.
@@ -339,7 +354,7 @@ class OC_Bundles_Invoice {
 	public static function remove_split_lines( $order, $item, $legacy_only = false ) {
 		$parent_id = (int) $item->get_id();
 		$bundle_id = (int) $item->get_product_id();
-		$token     = (string) $item->get_meta( self::TOKEN );
+		$uid       = (string) $item->get_meta( self::LINE_UID );
 
 		$siblings = 0;
 		foreach ( $order->get_items() as $line ) {
@@ -353,16 +368,16 @@ class OC_Bundles_Invoice {
 			if ( '' === (string) $line->get_meta( self::MARKER ) ) {
 				continue;
 			}
-			$linked = (string) $line->get_meta( self::PARENT );
-			if ( '' !== $linked ) {
-				if ( ! $legacy_only && $parent_id && (int) $linked === $parent_id ) {
+			$line_uid = (string) $line->get_meta( self::PARENT );
+			if ( '' !== $line_uid ) {
+				if ( ! $legacy_only && '' !== $uid && $line_uid === $uid ) {
 					$order->remove_item( $line_id );
 				}
 				continue;
 			}
-			$line_token = (string) $line->get_meta( self::PARENT_TOKEN );
-			if ( '' !== $line_token ) {
-				if ( ! $legacy_only && '' !== $token && $line_token === $token ) {
+			$linked = (int) $line->get_meta( self::PARENT_ITEM );
+			if ( $linked > 0 ) {
+				if ( ! $legacy_only && $parent_id && $linked === $parent_id ) {
 					$order->remove_item( $line_id );
 				}
 				continue;
@@ -505,27 +520,22 @@ class OC_Bundles_Invoice {
 
 		$tax_class = $item->get_tax_class();
 
-		// No item id yet (unsaved bundle line): link through a shared token that
-		// backfill_parent_ids() turns into the real item id after the save.
-		$token = '';
-		if ( (int) $parent_item_id <= 0 ) {
-			$token = (string) $item->get_meta( self::TOKEN );
-			if ( '' === $token ) {
-				$token = function_exists( 'wp_generate_uuid4' ) ? wp_generate_uuid4() : uniqid( 'ocb', true );
-				$item->update_meta_data( self::TOKEN, $token );
-			}
+		// The bundle line's uid links its component lines to it whether or not it has an
+		// item id yet; backfill_parent_ids() adds the item id after the save.
+		$uid = (string) $item->get_meta( self::LINE_UID );
+		if ( '' === $uid ) {
+			$uid = function_exists( 'wp_generate_uuid4' ) ? wp_generate_uuid4() : uniqid( 'ocb', true );
+			$item->update_meta_data( self::LINE_UID, $uid );
 		}
+		$qty_lines = false;
 
 		foreach ( $components as $index => $component ) {
 			$reuse      = isset( $existing[ $index ] ) && $existing[ $index ] instanceof WC_Order_Item_Product ? $existing[ $index ] : null;
 			$actual_qty = ( isset( $actual[ $index ] ) && '' !== (string) $actual[ $index ] ) ? max( 0, (float) $actual[ $index ] ) : null;
 
-			$line = self::build_component_line( $component, $bundle_qty, $item->get_product_id(), $tax_class, $index, $parent_item_id, $actual_qty, $reuse );
+			$line = self::build_component_line( $component, $bundle_qty, $item->get_product_id(), $tax_class, $index, $parent_item_id, $actual_qty, $reuse, $uid );
 			if ( ! $line ) {
 				continue; // Product gone: an existing line for this slot stays in `$existing` and is removed by the caller.
-			}
-			if ( '' !== $token ) {
-				$line->add_meta_data( self::PARENT_TOKEN, $token, true );
 			}
 
 			$amount = isset( $amounts[ $index ] ) ? $amounts[ $index ] : 0;
@@ -543,11 +553,26 @@ class OC_Bundles_Invoice {
 			}
 			$line->set_taxes( array( 'total' => $taxes, 'subtotal' => $taxes ) );
 
+			// Kept so a re-weigh on the order screen that must not move money can put the
+			// line back (OC_Bundles_Order::restore_amounts) - to THIS amount, which for a
+			// Giorgio-priced line is the amount Giorgio pushed.
+			$line->add_meta_data( self::AMOUNT, $amount, true );
+			$line->add_meta_data( self::TAXES, $line->get_taxes(), true );
+
+			$qty_lines = $qty_lines || (bool) $line->get_meta( self::QTY_LINE );
+
 			if ( $reuse ) {
 				unset( $existing[ $index ] );
 			} else {
 				$order->add_item( $line );
 			}
+		}
+
+		// Tells OC_Bundles_Order these lines are the weighed amounts, even after one is removed.
+		if ( $qty_lines ) {
+			$item->update_meta_data( self::QTY_LINES, 1 );
+		} elseif ( '' !== (string) $item->get_meta( self::QTY_LINES ) ) {
+			$item->delete_meta_data( self::QTY_LINES );
 		}
 
 		return $existing;
@@ -566,9 +591,10 @@ class OC_Bundles_Invoice {
 	 * @param float|null                 $actual_qty     Weighed line total for this slot (in the
 	 *                                                   component's unit); null = ordered quantity.
 	 * @param WC_Order_Item_Product|null $line           Existing line to refresh instead of creating one.
+	 * @param string                     $uid            LINE_UID of the bundle line.
 	 * @return WC_Order_Item_Product|null
 	 */
-	protected static function build_component_line( $component, $bundle_qty, $bundle_id, $tax_class, $index = null, $parent_item_id = 0, $actual_qty = null, $line = null ) {
+	protected static function build_component_line( $component, $bundle_qty, $bundle_id, $tax_class, $index = null, $parent_item_id = 0, $actual_qty = null, $line = null, $uid = '' ) {
 		$component = OC_Bundles_Helpers::normalize_component( $component, $index );
 		$pid       = OC_Bundles_Helpers::effective_id( $component );
 		$product   = $pid ? wc_get_product( $pid ) : false;
@@ -576,24 +602,46 @@ class OC_Bundles_Invoice {
 			return null;
 		}
 
-		// Show what actually ships: the weighed line total when there is one, otherwise
-		// the per-bundle quantity times the number of bundles.
-		$scaled        = $component;
-		$scaled['qty'] = ( null !== $actual_qty ) ? (float) $actual_qty : (float) $component['qty'] * $bundle_qty;
-		$label         = OC_Bundles_Helpers::quantity_label( $scaled );
+		// What actually ships: the weighed line total when there is one, otherwise the
+		// per-bundle quantity times the number of bundles.
+		$qty = ( null !== $actual_qty ) ? (float) $actual_qty : (float) $component['qty'] * $bundle_qty;
 
 		if ( ! $line instanceof WC_Order_Item_Product ) {
 			$line = new WC_Order_Item_Product();
 		}
-		$line->set_name( trim( $label . ' ' . $product->get_name() ) );
-		$line->set_quantity( 1 );
 		$line->set_tax_class( $tax_class );
 		$line->add_meta_data( self::MARKER, (int) $bundle_id, true );
 		if ( null !== $index ) {
 			$line->add_meta_data( self::INDEX, (int) $index, true );
 		}
+		if ( '' !== $uid ) {
+			$line->add_meta_data( self::PARENT, $uid, true );
+		}
 		if ( (int) $parent_item_id > 0 ) {
-			$line->add_meta_data( self::PARENT, (int) $parent_item_id, true );
+			$line->add_meta_data( self::PARENT_ITEM, (int) $parent_item_id, true );
+		}
+
+		$unit_key = __( 'Unit', 'oc-bundles' );
+		if ( self::quantity_fits( $qty ) ) {
+			// An ordinary line: the product's name, the quantity in the quantity column and the
+			// unit beside it, so re-weighing is editing the quantity like on any other line.
+			$line->set_name( $product->get_name() );
+			$line->set_quantity( $qty );
+			$line->add_meta_data( self::QTY_LINE, 1, true );
+			$line->add_meta_data( $unit_key, OC_Bundles_Helpers::display_suffix( $component['unit'], $component['unit_label'] ), true );
+		} else {
+			// This store keeps whole-number line quantities (no weighable-products plugin), so a
+			// fraction cannot live in the quantity: name it instead, as before 1.4.7.
+			$scaled        = $component;
+			$scaled['qty'] = $qty;
+			$line->set_name( trim( OC_Bundles_Helpers::quantity_label( $scaled ) . ' ' . $product->get_name() ) );
+			$line->set_quantity( 1 );
+			if ( '' !== (string) $line->get_meta( self::QTY_LINE ) ) {
+				$line->delete_meta_data( self::QTY_LINE );
+			}
+			if ( '' !== (string) $line->get_meta( $unit_key ) ) {
+				$line->delete_meta_data( $unit_key );
+			}
 		}
 
 		// Visible metas follow the product now in the slot (it may have been swapped
@@ -612,6 +660,17 @@ class OC_Bundles_Invoice {
 		}
 
 		return $line;
+	}
+
+	/**
+	 * Whether a line quantity can hold this amount as-is. WooCommerce's own wc_stock_amount()
+	 * rounds to whole numbers; a weighable-products plugin lets it keep fractions.
+	 *
+	 * @param float $qty Quantity.
+	 * @return bool
+	 */
+	protected static function quantity_fits( $qty ) {
+		return abs( (float) wc_stock_amount( $qty ) - (float) $qty ) < 0.00001;
 	}
 
 	/**

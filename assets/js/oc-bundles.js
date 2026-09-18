@@ -57,7 +57,7 @@
 		} else {
 			$price.find( '.oc-price-amount' ).html( formatPrice( sale ) );
 		}
-		$bundle.find( '.oc-add-price' ).html( formatPrice( sale ) );
+		$bundle.find( '.oc-add-price' ).html( formatPrice( sale ) ).attr( 'data-amount', sale );
 	}
 
 	/* ---- Quantity stepper (number of bundles) ---- */

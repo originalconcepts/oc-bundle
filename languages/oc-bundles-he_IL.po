@@ -271,3 +271,6 @@ msgstr "אפשר למבצעי החנות לחול על מארזים"
 
 msgid "When on, the bundle price is set early in the cart calculation so promotion plugins can discount it. Turn off to restore the previous behaviour."
 msgstr "כשמופעל, מחיר המארז נקבע בשלב מוקדם של חישוב הסל כך שתוספי מבצעים יכולים להנחות אותו. כבו כדי לחזור להתנהגות הקודמת."
+
+msgid "Unit"
+msgstr "יחידת מידה"
