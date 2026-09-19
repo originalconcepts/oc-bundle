@@ -4,7 +4,7 @@ Requires at least: 6.2
 Tested up to: 6.8
 Requires PHP: 7.4
 WC requires at least: 7.0
-Stable tag: 1.5.1
+Stable tag: 1.5.2
 License: GPL-2.0+
 
 WooCommerce product bundles: a "Bundle" product type made of products and
@@ -63,6 +63,21 @@ For a private repo or to avoid GitHub rate limits, add a token:
        define( 'OC_BUNDLES_GITHUB_TOKEN', 'ghp_xxx' );
 
 == Changelog ==
+
+= 1.5.2 =
+* Catalog / archive price of a bundle now includes the surcharge of AUTOMATIC swaps: with
+  "Swap automatically", an out-of-stock component is replaced by its first in-stock
+  alternative, and the listed price (regular and sale) is the price the customer gets in
+  the cart - it used to show the price with the component that cannot be bought.
+* Alternatives can carry their OWN quantity: `qty` on a swap entry (REST API, and a
+  "Quantity" field next to the surcharge in the admin). Empty / 0 keeps inheriting the
+  component's quantity. An alternative with its own quantity is measured the way its
+  product is sold (kg for a product sold by weight, units otherwise), in the cart, on
+  the order line and for stock.
+* oc_bundles_add_order_line() / oc_bundles_update_order_line(): a swapped component may
+  state `qty` (per bundle) and `unit` explicitly - an integration that re-expresses a
+  swap to a differently measured product by weight (2 portions of 0.2 kg -> 0.4 kg)
+  keeps the order line, its label and its stock in that unit.
 
 = 1.5.1 =
 * Merged with 1.4.7: a bundle split for the invoice keeps the ordinary component lines

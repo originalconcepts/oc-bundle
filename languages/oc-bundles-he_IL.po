@@ -274,3 +274,6 @@ msgstr "כשמופעל, מחיר המארז נקבע בשלב מוקדם של ח
 
 msgid "Unit"
 msgstr "יחידת מידה"
+
+msgid "Same as the component"
+msgstr "כמו הרכיב"

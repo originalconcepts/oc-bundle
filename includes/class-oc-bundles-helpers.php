@@ -80,6 +80,8 @@ class OC_Bundles_Helpers {
 					'product_id'   => isset( $swap['product_id'] ) ? absint( $swap['product_id'] ) : 0,
 					'variation_id' => isset( $swap['variation_id'] ) ? absint( $swap['variation_id'] ) : 0,
 					'surcharge'    => isset( $swap['surcharge'] ) ? (float) $swap['surcharge'] : 0,
+					// Own quantity per bundle, in the ALTERNATIVE's unit (0 = inherit the slot's).
+					'qty'          => ( isset( $swap['qty'] ) && (float) $swap['qty'] > 0 ) ? (float) $swap['qty'] : 0,
 				);
 			}
 		}
@@ -385,6 +387,44 @@ class OC_Bundles_Helpers {
 		}
 
 		return $spec;
+	}
+
+	/**
+	 * A slot with one of its alternatives in it, in the shape the cart and the order line keep.
+	 *
+	 * By default the alternative inherits the slot's quantity and unit. An alternative that
+	 * carries its OWN quantity is measured the way its product is sold (kg for a product sold
+	 * by weight, units otherwise), so unit / mode / unit weight come from that product.
+	 *
+	 * @param array $component Normalized original component.
+	 * @param array $swap      One entry of $component['swaps'].
+	 * @return array
+	 */
+	public static function swapped_component( $component, $swap ) {
+		$resolved = array(
+			// The slot keeps its identity across a swap.
+			'key'          => $component['key'],
+			'product_id'   => absint( $swap['product_id'] ),
+			'variation_id' => absint( $swap['variation_id'] ),
+			'qty'          => $component['qty'],
+			'unit'         => $component['unit'],
+			'unit_label'   => $component['unit_label'],
+			'unit_weight'  => $component['unit_weight'],
+			'mode'         => $component['mode'],
+			'swappable'    => 'no',
+			'swaps'        => array(),
+		);
+
+		if ( isset( $swap['qty'] ) && (float) $swap['qty'] > 0 ) {
+			$spec                    = self::product_spec( self::effective_id( $resolved ) );
+			$resolved['qty']         = (float) $swap['qty'];
+			$resolved['unit']        = $spec['unit'];
+			$resolved['unit_label']  = $spec['unit_label'];
+			$resolved['unit_weight'] = $spec['unit_weight'];
+			$resolved['mode']        = $spec['mode'];
+		}
+
+		return $resolved;
 	}
 
 	/**

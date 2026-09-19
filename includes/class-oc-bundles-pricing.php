@@ -162,7 +162,7 @@ class OC_Bundles_Pricing {
 			return $price;
 		}
 		self::$in_filter = true;
-		$computed        = self::base_price( $product->get_id() );
+		$computed        = self::base_price( $product->get_id() ) + self::auto_swap_surcharge( $product->get_id() );
 		self::$in_filter = false;
 		return (string) $computed;
 	}
@@ -179,7 +179,7 @@ class OC_Bundles_Pricing {
 			return $price;
 		}
 		self::$in_filter = true;
-		$computed        = self::raw_base_price( $product->get_id() );
+		$computed        = self::raw_base_price( $product->get_id() ) + self::auto_swap_surcharge( $product->get_id() );
 		self::$in_filter = false;
 		return (string) $computed;
 	}
@@ -200,8 +200,46 @@ class OC_Bundles_Pricing {
 		$config          = OC_Bundles_Helpers::get_config( $product->get_id() );
 		$raw             = self::raw_base_price( $product->get_id(), null, $config );
 		$base            = self::base_price( $product->get_id(), null, $config );
+		$auto            = self::auto_swap_surcharge( $product->get_id(), $config );
 		self::$in_filter = false;
-		return $base < $raw ? (string) $base : '';
+		return $base < $raw ? (string) ( $base + $auto ) : '';
+	}
+
+	/**
+	 * Surcharges of the swaps the shop applies BY ITSELF right now: with "swap automatically", a component that
+	 * is out of stock is replaced by its first in-stock alternative - and that alternative may cost extra. The
+	 * price shown for the bundle (catalog, product page, REST) must be the price the customer gets in the cart,
+	 * not the price with the component that cannot be bought.
+	 *
+	 * Display only: the cart line is still priced by line_price() from its own selection.
+	 *
+	 * @param int        $bundle_id Bundle ID.
+	 * @param array|null $config    Config.
+	 * @return float
+	 */
+	public static function auto_swap_surcharge( $bundle_id, $config = null ) {
+		static $cache = array();
+		$bundle_id = (int) $bundle_id;
+		if ( isset( $cache[ $bundle_id ] ) ) {
+			return $cache[ $bundle_id ];
+		}
+		if ( null === $config ) {
+			$config = OC_Bundles_Helpers::get_config( $bundle_id );
+		}
+		$total = 0.0;
+		if ( ! empty( $config['oos_behavior'] ) && 'swap' === $config['oos_behavior'] ) {
+			foreach ( OC_Bundles_Helpers::apply_auto_swaps( $config, array() ) as $index => $key ) {
+				if ( ! isset( $config['components'][ $index ] ) ) {
+					continue;
+				}
+				$component = OC_Bundles_Helpers::normalize_component( $config['components'][ $index ], $index );
+				if ( isset( $component['swaps'][ $key ]['surcharge'] ) ) {
+					$total += (float) $component['swaps'][ $key ]['surcharge'];
+				}
+			}
+		}
+		$cache[ $bundle_id ] = max( 0, round( $total, wc_get_price_decimals() ) );
+		return $cache[ $bundle_id ];
 	}
 
 	/**

@@ -359,19 +359,28 @@ function _oc_bundles_apply_line_spec( $item, $product, $spec, $is_new ) {
 					$surcharge = ( $k >= 0 ) ? (float) $orig['swaps'][ $k ]['surcharge'] : 0.0;
 				}
 
-				// Same shape OC_Bundles_Cart::resolve_components() gives a swapped slot.
-				$resolved = array(
-					'key'          => $orig['key'],
-					'product_id'   => $pid,
-					'variation_id' => $vid,
-					'qty'          => $orig['qty'],
-					'unit'         => $orig['unit'],
-					'unit_label'   => $orig['unit_label'],
-					'unit_weight'  => $orig['unit_weight'],
-					'mode'         => $orig['mode'],
-					'swappable'    => 'no',
-					'swaps'        => array(),
+				// Same shape OC_Bundles_Cart::resolve_components() gives a swapped slot (a configured
+				// alternative with its own quantity is measured in its own unit).
+				$resolved = OC_Bundles_Helpers::swapped_component(
+					$orig,
+					( $k >= 0 ) ? $orig['swaps'][ $k ] : array( 'product_id' => $pid, 'variation_id' => $vid )
 				);
+				$resolved['product_id']   = $pid;
+				$resolved['variation_id'] = $vid;
+
+				// The caller may state what the slot holds now, per bundle, in a unit of its own -
+				// Giorgio re-expresses a swap to a differently measured product by weight
+				// (2 portions of 0.2 kg -> 0.4 kg). Explicit values win over everything above.
+				if ( isset( $o['qty'] ) && is_numeric( $o['qty'] ) && (float) $o['qty'] > 0 ) {
+					$resolved['qty'] = (float) $o['qty'];
+					if ( isset( $o['unit'] ) && in_array( $o['unit'], array( 'kg', 'grams', 'unit' ), true ) && $o['unit'] !== $resolved['unit'] ) {
+						$spec                    = OC_Bundles_Helpers::product_spec( OC_Bundles_Helpers::effective_id( $resolved ) );
+						$resolved['unit']        = $o['unit'];
+						$resolved['unit_label']  = ( 'unit' === $o['unit'] ) ? $spec['unit_label'] : '';
+						$resolved['unit_weight'] = ( 'unit' === $o['unit'] ) ? $spec['unit_weight'] : 0;
+						$resolved['mode']        = ( 'unit' === $o['unit'] ) ? ( 'weight' === $spec['mode'] ? 'units' : $spec['mode'] ) : 'weight';
+					}
+				}
 
 				if ( $k >= 0 ) {
 					$selection[ $index ] = array(

@@ -273,3 +273,6 @@ msgid "When on, the bundle price is set early in the cart calculation so promoti
 
 msgid "Unit"
 msgstr ""
+
+msgid "Same as the component"
+msgstr ""

@@ -347,6 +347,7 @@ class OC_Bundles_API {
 					'product_id'   => $s['product_id'],
 					'variation_id' => $s['variation_id'],
 					'surcharge'    => (float) $s['surcharge'],
+					'qty'          => ( isset( $s['qty'] ) && (float) $s['qty'] > 0 ) ? (float) $s['qty'] : null,
 					'name'         => $sp ? $sp->get_name() : '',
 					'sku'          => $sp ? $sp->get_sku() : '',
 				);
@@ -558,6 +559,7 @@ class OC_Bundles_API {
 						'product_id'   => $spid,
 						'variation_id' => $svid,
 						'surcharge'    => isset( $s['surcharge'] ) ? (float) $s['surcharge'] : 0,
+						'qty'          => ( isset( $s['qty'] ) && is_numeric( $s['qty'] ) && (float) $s['qty'] > 0 ) ? (float) $s['qty'] : 0,
 					);
 				}
 			}

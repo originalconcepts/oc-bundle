@@ -344,6 +344,7 @@ class OC_Bundles_Admin {
 		$pid    = ! empty( $swap['variation_id'] ) ? $swap['variation_id'] : ( isset( $swap['product_id'] ) ? $swap['product_id'] : 0 );
 		$name   = $pid && wc_get_product( $pid ) ? wp_strip_all_tags( wc_get_product( $pid )->get_formatted_name() ) : '';
 		$surch  = isset( $swap['surcharge'] ) ? $swap['surcharge'] : 0;
+		$sqty   = ( isset( $swap['qty'] ) && (float) $swap['qty'] > 0 ) ? $swap['qty'] : '';
 		?>
 		<tr class="oc-swap-row">
 			<td class="oc-swap-product">
@@ -354,6 +355,10 @@ class OC_Bundles_Admin {
 			<td class="oc-swap-surcharge-cell">
 				<span class="oc-surcharge-label"><?php esc_html_e( 'Surcharge ₪', 'oc-bundles' ); ?></span>
 				<input type="number" step="0.01" name="oc_component_swap_surcharge[<?php echo esc_attr( $i ); ?>][<?php echo esc_attr( $oi ); ?>]" value="<?php echo esc_attr( $surch ); ?>" />
+			</td>
+			<td class="oc-swap-qty-cell">
+				<span class="oc-surcharge-label"><?php esc_html_e( 'Quantity', 'oc-bundles' ); ?></span>
+				<input type="number" step="any" min="0" name="oc_component_swap_qty[<?php echo esc_attr( $i ); ?>][<?php echo esc_attr( $oi ); ?>]" value="<?php echo esc_attr( $sqty ); ?>" placeholder="<?php esc_attr_e( 'Same as the component', 'oc-bundles' ); ?>" />
 			</td>
 			<td class="oc-swap-remove"><a href="#" class="oc-remove-row">&times;</a></td>
 		</tr>
@@ -467,6 +472,7 @@ class OC_Bundles_Admin {
 							'product_id'   => $sr['product_id'],
 							'variation_id' => $sr['variation_id'],
 							'surcharge'    => $surch,
+							'qty'          => isset( $_POST['oc_component_swap_qty'][ $i ][ $oi ] ) ? max( 0, (float) wc_clean( wp_unslash( $_POST['oc_component_swap_qty'][ $i ][ $oi ] ) ) ) : 0,
 						);
 					}
 				}

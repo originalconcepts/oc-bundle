@@ -78,19 +78,7 @@ class OC_Bundles_Cart {
 
 			if ( 'yes' === $component['swappable'] && $choice >= 0 && isset( $component['swaps'][ $choice ] ) ) {
 				$swap  = $component['swaps'][ $choice ];
-				$out[] = array(
-					// The slot keeps its identity across a swap.
-					'key'          => $component['key'],
-					'product_id'   => absint( $swap['product_id'] ),
-					'variation_id' => absint( $swap['variation_id'] ),
-					'qty'          => $component['qty'],
-					'unit'         => $component['unit'],
-					'unit_label'   => $component['unit_label'],
-					'unit_weight'  => $component['unit_weight'],
-					'mode'         => $component['mode'],
-					'swappable'    => 'no',
-					'swaps'        => array(),
-				);
+				$out[] = OC_Bundles_Helpers::swapped_component( $component, $swap );
 				$applied[ $index ] = array(
 					'swap_index' => $choice,
 					'surcharge'  => (float) $swap['surcharge'],
