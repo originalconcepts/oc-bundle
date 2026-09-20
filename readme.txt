@@ -4,7 +4,7 @@ Requires at least: 6.2
 Tested up to: 6.8
 Requires PHP: 7.4
 WC requires at least: 7.0
-Stable tag: 1.5.2
+Stable tag: 1.5.3
 License: GPL-2.0+
 
 WooCommerce product bundles: a "Bundle" product type made of products and
@@ -63,6 +63,16 @@ For a private repo or to avoid GitHub rate limits, add a token:
        define( 'OC_BUNDLES_GITHUB_TOKEN', 'ghp_xxx' );
 
 == Changelog ==
+
+= 1.5.3 =
+* Fix: a bundle whose price comes from its components showed "0.00" on the order, the
+  invoice and order emails, instead of no amount at all.
+* Fix: an order line pushed by an integration that both re-measures a component and sets
+  the line total lost that total, and the mark that says the price belongs to the
+  integration. The line was re-priced from the catalogue and could move again on a later
+  re-weigh, so the order stopped matching what the integration charged.
+* Fix: the translation template (languages/oc-bundles.pot) was missing a line and could
+  not be read by translation tools.
 
 = 1.5.2 =
 * Catalog / archive price of a bundle now includes the surcharge of AUTOMATIC swaps: with
