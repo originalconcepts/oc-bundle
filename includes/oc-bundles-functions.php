@@ -374,11 +374,13 @@ function _oc_bundles_apply_line_spec( $item, $product, $spec, $is_new ) {
 				if ( isset( $o['qty'] ) && is_numeric( $o['qty'] ) && (float) $o['qty'] > 0 ) {
 					$resolved['qty'] = (float) $o['qty'];
 					if ( isset( $o['unit'] ) && in_array( $o['unit'], array( 'kg', 'grams', 'unit' ), true ) && $o['unit'] !== $resolved['unit'] ) {
-						$spec                    = OC_Bundles_Helpers::product_spec( OC_Bundles_Helpers::effective_id( $resolved ) );
+						// NOT $spec: that is this function's payload, read further down for
+						// `line_total` and `external_id`.
+						$pspec                   = OC_Bundles_Helpers::product_spec( OC_Bundles_Helpers::effective_id( $resolved ) );
 						$resolved['unit']        = $o['unit'];
-						$resolved['unit_label']  = ( 'unit' === $o['unit'] ) ? $spec['unit_label'] : '';
-						$resolved['unit_weight'] = ( 'unit' === $o['unit'] ) ? $spec['unit_weight'] : 0;
-						$resolved['mode']        = ( 'unit' === $o['unit'] ) ? ( 'weight' === $spec['mode'] ? 'units' : $spec['mode'] ) : 'weight';
+						$resolved['unit_label']  = ( 'unit' === $o['unit'] ) ? $pspec['unit_label'] : '';
+						$resolved['unit_weight'] = ( 'unit' === $o['unit'] ) ? $pspec['unit_weight'] : 0;
+						$resolved['mode']        = ( 'unit' === $o['unit'] ) ? ( 'weight' === $pspec['mode'] ? 'units' : $pspec['mode'] ) : 'weight';
 					}
 				}
 
