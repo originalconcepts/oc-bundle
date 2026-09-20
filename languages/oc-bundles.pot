@@ -270,6 +270,7 @@ msgid "Allow store promotions to apply to bundles"
 msgstr ""
 
 msgid "When on, the bundle price is set early in the cart calculation so promotion plugins can discount it. Turn off to restore the previous behaviour."
+msgstr ""
 
 msgid "Unit"
 msgstr ""

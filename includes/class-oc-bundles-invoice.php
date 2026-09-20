@@ -753,14 +753,18 @@ class OC_Bundles_Invoice {
 		}
 		$bundle_id = (int) $item->get_product_id();
 		$item_id   = (int) $item->get_id();
+		$uid       = (string) $item->get_meta( self::LINE_UID );
 		foreach ( $order->get_items() as $line ) {
 			if ( (int) $line->get_meta( self::MARKER ) !== $bundle_id ) {
 				continue;
 			}
-			// Linked lines belong to exactly one bundle line; unlinked ones (split before
-			// 1.5.0) can only be matched by product.
-			$linked = (string) $line->get_meta( self::PARENT );
-			if ( '' === $linked || ( $item_id && (int) $linked === $item_id ) ) {
+			// Linked lines belong to exactly one bundle line -- by that line's uid, or by its
+			// item id. Lines split before 1.4.7 carry neither and can only be matched by product.
+			$line_uid = (string) $line->get_meta( self::PARENT );
+			$linked   = (int) $line->get_meta( self::PARENT_ITEM );
+			if ( ( '' === $line_uid && $linked <= 0 )
+				|| ( '' !== $uid && $line_uid === $uid )
+				|| ( $item_id && $linked === $item_id ) ) {
 				return '';
 			}
 		}
