@@ -506,18 +506,11 @@ class OC_Bundles_Admin {
 		}
 		update_post_meta( $post_id, '_oc_bundle_components', $components );
 
-		// Sync WooCommerce price meta (regular + sale when discounted).
-		$price_config = array_merge(
-			OC_Bundles_Helpers::defaults(),
-			array(
-				'components'     => $components,
-				'pricing_mode'   => $pricing_mode,
-				'fixed_price'    => (float) get_post_meta( $post_id, '_oc_bundle_fixed_price', true ),
-				'discount_type'  => $discount_type,
-				'discount_value' => (float) get_post_meta( $post_id, '_oc_bundle_discount_value', true ),
-			)
-		);
-		OC_Bundles_Pricing::sync_price_meta( $post_id, $price_config );
+		// Sync WooCommerce price meta (regular + sale when discounted). Every setting above is in
+		// post meta by now, so let it read the WHOLE config: a partial one defaulted `oos_behavior`
+		// to "unavailable", and the stored price then lost the automatic-swap surcharge that the
+		// product page and the cart do show.
+		OC_Bundles_Pricing::sync_price_meta( $post_id );
 
 		self::maybe_update_short_description( $post_id, $components );
 	}

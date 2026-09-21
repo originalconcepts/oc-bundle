@@ -515,13 +515,17 @@ function _oc_bundles_release_replaced_components( $item, $components ) {
 
 	if ( $changed ) {
 		$item->update_meta_data( OC_Bundles_Order::LEDGER, $ledger );
+		// Same rule as everywhere else: stock went back with an immediate write, so the ledger
+		// goes with it. A rebuild that fails before its own save would return it twice.
+		OC_Bundles_Order::persist_ledger( $item, $ledger );
 	}
 }
 
 /**
  * After the line itself is written: re-do the invoice split (component lines updated
  * in place, missing ones added, stale ones dropped), then reconcile component stock
- * for the order (in memory). Nothing is saved.
+ * for the order. The line, the split lines and the order totals are the caller's to save;
+ * component stock moves right away, and so does the ledger that records it.
  *
  * The split goes FIRST: OC_Bundles_Order::reconcile() re-prices a `sum` + re-weigh
  * bundle from the weighed quantities, and when the line is split it writes those
@@ -548,8 +552,9 @@ function _oc_bundles_finish_line( $order, $item ) {
  * products — the order's other bundle lines are untouched — and the ledger is then
  * cleared (left as an empty array, so a line that is kept after all is re-taken in
  * full by the next reconcile rather than re-seeded from the legacy order flag).
- * Nothing is saved: the caller removes the line and saves the order. Component
- * (split) lines carry no product and need no release.
+ * The stock move is immediate and so is the ledger that records it; the line itself is
+ * the caller's to remove and save. Component (split) lines carry no product and need no
+ * release.
  *
  * @param WC_Order              $order Order holding the line (the caller's in-memory instance).
  * @param WC_Order_Item_Product $item  Bundle line about to be removed.

@@ -152,6 +152,11 @@ class OC_Bundles_Order {
 				$item->update_meta_data( self::LEDGER, $ledger );
 				if ( $persist ) {
 					$item->save();
+				} else {
+					// Stock moved with an immediate write, so the ledger that records it has to be
+					// just as durable: a caller that never reaches its own save (a failed rebuild)
+					// would otherwise move the same stock again on the next try.
+					self::persist_ledger( $item, $ledger );
 				}
 				$dirty = true;
 			}
@@ -503,7 +508,7 @@ class OC_Bundles_Order {
 	 * line is touched — reconcile() walks every bundle line of the order. The ledger is
 	 * left as an EMPTY array rather than deleted: should the line survive after all, the
 	 * next reconcile() re-takes its stock in full instead of seeding the ledger from the
-	 * legacy order flag. Nothing is saved; the caller saves (or removes the line).
+	 * legacy order flag. Only that ledger is written; the line itself is the caller's to save or remove.
 	 *
 	 * @param WC_Order_Item_Product $item Bundle line.
 	 */
@@ -536,8 +541,23 @@ class OC_Bundles_Order {
 		// The stock went back with an immediate DB write; the emptied ledger must be just as durable. Left in
 		// memory only, a caller that fails before saving the order (e.g. the Giorgio order rebuild) kept a line
 		// that still "holds" stock already returned - and every retry returned it again (inflated stock).
-		if ( $item->get_id() > 0 ) {
-			$item->save_meta_data();
+		self::persist_ledger( $item, array() );
+	}
+
+	/**
+	 * Write a line's ledger straight to the database, and nothing else it has staged.
+	 *
+	 * Component stock moves with an immediate write, so the record of it must not wait for a save
+	 * that may never happen. A line that has no id yet has no row to write to: its ledger travels
+	 * with it when the caller saves.
+	 *
+	 * @param WC_Order_Item_Product $item   Bundle line.
+	 * @param array                 $ledger Ledger to persist.
+	 */
+	public static function persist_ledger( $item, $ledger ) {
+		$item_id = ( $item instanceof WC_Order_Item_Product ) ? (int) $item->get_id() : 0;
+		if ( $item_id > 0 ) {
+			wc_update_order_item_meta( $item_id, self::LEDGER, $ledger );
 		}
 	}
 

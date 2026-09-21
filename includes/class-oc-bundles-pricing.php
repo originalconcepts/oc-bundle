@@ -333,8 +333,9 @@ class OC_Bundles_Pricing {
 	 *
 	 * @param int        $bundle_id Bundle ID.
 	 * @param array|null $config    Config.
+	 * @param bool       $flush     False to leave the product transients to the caller (bulk re-sync).
 	 */
-	public static function sync_price_meta( $bundle_id, $config = null ) {
+	public static function sync_price_meta( $bundle_id, $config = null, $flush = true ) {
 		$bundle_id = (int) $bundle_id;
 		if ( null === $config ) {
 			$config = OC_Bundles_Helpers::get_config( $bundle_id );
@@ -368,7 +369,9 @@ class OC_Bundles_Pricing {
 				array( '%d' )
 			);
 		}
-		wc_delete_product_transients( $bundle_id );
+		if ( $flush ) {
+			wc_delete_product_transients( $bundle_id );
+		}
 	}
 
 	/**
@@ -385,6 +388,7 @@ class OC_Bundles_Pricing {
 		$parent_id = (int) wp_get_post_parent_id( $product_id );
 		$ids       = array_filter( array( $product_id, $parent_id ) );
 
+		$synced = false;
 		foreach ( self::all_bundle_ids() as $bundle_id ) {
 			$config = OC_Bundles_Helpers::get_config( $bundle_id );
 			if ( empty( $config['oos_behavior'] ) || 'swap' !== $config['oos_behavior'] ) {
@@ -406,8 +410,15 @@ class OC_Bundles_Pricing {
 				}
 			}
 			if ( $uses ) {
-				self::sync_price_meta( $bundle_id, $config );
+				// Flushed once below: wc_delete_product_transients() bumps the site-wide product
+				// transient version, and a stock sync can flip hundreds of products in a row.
+				self::sync_price_meta( $bundle_id, $config, false );
+				$synced = true;
 			}
+		}
+
+		if ( $synced ) {
+			wc_delete_product_transients();
 		}
 	}
 
