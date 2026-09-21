@@ -4,7 +4,7 @@ Requires at least: 6.2
 Tested up to: 6.8
 Requires PHP: 7.4
 WC requires at least: 7.0
-Stable tag: 1.5.3
+Stable tag: 1.5.4
 License: GPL-2.0+
 
 WooCommerce product bundles: a "Bundle" product type made of products and
@@ -63,6 +63,15 @@ For a private repo or to avoid GitHub rate limits, add a token:
        define( 'OC_BUNDLES_GITHUB_TOKEN', 'ghp_xxx' );
 
 == Changelog ==
+
+= 1.5.4 =
+* Fix: the price stored for a bundle left out the surcharge of an automatic swap, so the
+  shop sorted and filtered by a lower price than the one shown on the page and in the cart.
+  The stored price now matches the displayed one, reaches the product lookup table, and is
+  refreshed whenever a component (or one of its alternatives) goes in or out of stock.
+* Fix: returning the component stock of an order line is now recorded right away. When an
+  integration failed half way through rebuilding an order, a retry returned the same stock
+  a second time.
 
 = 1.5.3 =
 * Fix: a bundle whose price comes from its components showed "0.00" on the order, the

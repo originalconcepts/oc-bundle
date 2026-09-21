@@ -39,6 +39,11 @@ class OC_Bundles_Pricing {
 		add_filter( 'woocommerce_product_get_price', array( __CLASS__, 'restore_line_price' ), 20, 2 );
 		add_filter( 'woocommerce_product_get_regular_price', array( __CLASS__, 'restore_line_regular_price' ), 20, 2 );
 		add_filter( 'woocommerce_product_get_sale_price', array( __CLASS__, 'restore_line_sale_price' ), 20, 2 );
+
+		// The stored price includes the automatic-swap surcharge, and that depends on which components are in
+		// stock right now - so it is re-synced whenever the stock status of a component changes.
+		add_action( 'woocommerce_product_set_stock_status', array( __CLASS__, 'resync_bundles_of_component' ), 20, 1 );
+		add_action( 'woocommerce_variation_set_stock_status', array( __CLASS__, 'resync_bundles_of_component' ), 20, 1 );
 	}
 
 	/**
@@ -217,10 +222,11 @@ class OC_Bundles_Pricing {
 	 * @param array|null $config    Config.
 	 * @return float
 	 */
-	public static function auto_swap_surcharge( $bundle_id, $config = null ) {
+	public static function auto_swap_surcharge( $bundle_id, $config = null, $fresh = false ) {
 		static $cache = array();
 		$bundle_id = (int) $bundle_id;
-		if ( isset( $cache[ $bundle_id ] ) ) {
+		// $fresh: the stock of a component just changed in this request - the cached figure is the old one.
+		if ( ! $fresh && isset( $cache[ $bundle_id ] ) ) {
 			return $cache[ $bundle_id ];
 		}
 		if ( null === $config ) {
@@ -320,24 +326,118 @@ class OC_Bundles_Pricing {
 	 * Keep WooCommerce's price meta in sync so archives/search show the
 	 * regular (struck) + sale price natively when a discount applies.
 	 *
+	 * The stored figures are the ones the price filters display: base / raw price PLUS the automatic-swap
+	 * surcharge. Without it the page and the cart showed 469.20 while _price stayed 439.20, so the price
+	 * sorting and the price filter of the shop worked on a number the customer never sees. The product lookup
+	 * table (what WooCommerce actually sorts and filters by) is updated too - post meta alone does not reach it.
+	 *
 	 * @param int        $bundle_id Bundle ID.
 	 * @param array|null $config    Config.
 	 */
 	public static function sync_price_meta( $bundle_id, $config = null ) {
+		$bundle_id = (int) $bundle_id;
 		if ( null === $config ) {
 			$config = OC_Bundles_Helpers::get_config( $bundle_id );
 		}
-		$raw  = self::raw_base_price( $bundle_id, $config['components'], $config );
-		$base = self::base_price( $bundle_id, $config['components'], $config );
+		$decimals = wc_get_price_decimals();
+		$auto     = self::auto_swap_surcharge( $bundle_id, $config, true );
+		$raw      = round( self::raw_base_price( $bundle_id, $config['components'], $config ) + $auto, $decimals );
+		$base     = round( self::base_price( $bundle_id, $config['components'], $config ) + $auto, $decimals );
+		$on_sale  = $base < $raw;
 
 		update_post_meta( $bundle_id, '_price', $base );
-		if ( $base < $raw ) {
+		if ( $on_sale ) {
 			update_post_meta( $bundle_id, '_regular_price', $raw );
 			update_post_meta( $bundle_id, '_sale_price', $base );
 		} else {
 			update_post_meta( $bundle_id, '_regular_price', $base );
 			update_post_meta( $bundle_id, '_sale_price', '' );
 		}
+
+		global $wpdb;
+		if ( ! empty( $wpdb->wc_product_meta_lookup ) ) {
+			$wpdb->update(
+				$wpdb->wc_product_meta_lookup,
+				array(
+					'min_price' => $base,
+					'max_price' => $base,
+					'onsale'    => $on_sale ? 1 : 0,
+				),
+				array( 'product_id' => $bundle_id ),
+				array( '%f', '%f', '%d' ),
+				array( '%d' )
+			);
+		}
+		wc_delete_product_transients( $bundle_id );
+	}
+
+	/**
+	 * The stock status of a product (or variation) changed: every "swap automatically" bundle that uses it as a
+	 * component or as an alternative may now show a different automatic-swap surcharge - re-sync its stored price.
+	 *
+	 * @param int $product_id Product or variation ID whose stock status changed.
+	 */
+	public static function resync_bundles_of_component( $product_id ) {
+		$product_id = (int) $product_id;
+		if ( $product_id <= 0 ) {
+			return;
+		}
+		$parent_id = (int) wp_get_post_parent_id( $product_id );
+		$ids       = array_filter( array( $product_id, $parent_id ) );
+
+		foreach ( self::all_bundle_ids() as $bundle_id ) {
+			$config = OC_Bundles_Helpers::get_config( $bundle_id );
+			if ( empty( $config['oos_behavior'] ) || 'swap' !== $config['oos_behavior'] ) {
+				continue;
+			}
+			$uses = false;
+			foreach ( $config['components'] as $index => $raw_component ) {
+				$component = OC_Bundles_Helpers::normalize_component( $raw_component, $index );
+				$refs      = array( (int) $component['product_id'], (int) $component['variation_id'] );
+				if ( ! empty( $component['swaps'] ) && is_array( $component['swaps'] ) ) {
+					foreach ( $component['swaps'] as $swap ) {
+						$refs[] = isset( $swap['product_id'] ) ? (int) $swap['product_id'] : 0;
+						$refs[] = isset( $swap['variation_id'] ) ? (int) $swap['variation_id'] : 0;
+					}
+				}
+				if ( array_intersect( $ids, $refs ) ) {
+					$uses = true;
+					break;
+				}
+			}
+			if ( $uses ) {
+				self::sync_price_meta( $bundle_id, $config );
+			}
+		}
+	}
+
+	/**
+	 * IDs of all bundle products (once per request - a stock sync touches many products in a row).
+	 *
+	 * @return int[]
+	 */
+	protected static function all_bundle_ids() {
+		static $ids = null;
+		if ( null === $ids ) {
+			$ids = get_posts(
+				array(
+					'post_type'      => 'product',
+					'post_status'    => array( 'publish', 'private', 'draft', 'pending' ),
+					'fields'         => 'ids',
+					'posts_per_page' => -1,
+					'no_found_rows'  => true,
+					'tax_query'      => array(
+						array(
+							'taxonomy' => 'product_type',
+							'field'    => 'slug',
+							'terms'    => OC_BUNDLES_PRODUCT_TYPE,
+						),
+					),
+				)
+			);
+			$ids = array_map( 'intval', (array) $ids );
+		}
+		return $ids;
 	}
 
 	/**

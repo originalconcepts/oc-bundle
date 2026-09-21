@@ -533,6 +533,12 @@ class OC_Bundles_Order {
 		}
 
 		$item->update_meta_data( self::LEDGER, array() );
+		// The stock went back with an immediate DB write; the emptied ledger must be just as durable. Left in
+		// memory only, a caller that fails before saving the order (e.g. the Giorgio order rebuild) kept a line
+		// that still "holds" stock already returned - and every retry returned it again (inflated stock).
+		if ( $item->get_id() > 0 ) {
+			$item->save_meta_data();
+		}
 	}
 
 	/**
